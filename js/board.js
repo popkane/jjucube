@@ -149,3 +149,49 @@ export function layoutFromTable(table, board = DEFAULT_BOARD) {
   table.forEach((set, r) => set.forEach((id, i) => { flat[id] = [r, i]; }));
   return tidy(flat, { ...board, rows: Math.max(board.rows, table.length) });
 }
+
+// 빈 곳 찾기: 양옆이 비어 있어서 다른 조합과 붙지 않는 자리 (위에서부터)
+function freeSpot(layout, board, k) {
+  const g = makeGrid(layout, board);
+  for (let r = 0; r < board.rows; r++) {
+    for (let s = 0; s + k <= board.cols; s++) {
+      let ok = (s === 0 || g[r][s - 1] === null) && (s + k === board.cols || g[r][s + k] === null);
+      for (let i = s; ok && i < s + k; i++) if (g[r][i] !== null) ok = false;
+      if (ok) return { row: r, start: s };
+    }
+  }
+  return null;
+}
+
+// 조합 목록(컴퓨터가 낸 결과)을 바닥에 놓는다: 그대로인 조합은 제자리, 바뀌었거나 새로 생긴 조합은 빈 곳에.
+// 빈 곳이 없으면 정돈해 보고, 그래도 없으면 줄을 늘린다.
+export function arrangeTable(layout, board, table) {
+  const key = (ids) => ids.join(',');
+  const keep = new Map(segments(layout).map((s) => [key(s.ids), s]));
+  let out = {};
+  const pending = [];
+  for (const set of table) {
+    const ids = setOrder(set) || set;
+    const s = keep.get(key(ids));
+    if (s) {
+      ids.forEach((id, i) => { out[id] = [s.row, s.start + i]; });
+      keep.delete(key(ids));
+    } else pending.push(ids);
+  }
+  let bd = { ...board, cols: Math.max(board.cols, ...pending.map((p) => p.length)) };
+  let tidied = false;
+  for (const ids of pending) {
+    let spot = freeSpot(out, bd, ids.length);
+    if (!spot && !tidied) {
+      ({ layout: out, board: bd } = tidy(out, bd));
+      tidied = true;
+      spot = freeSpot(out, bd, ids.length);
+    }
+    while (!spot) {
+      bd = { ...bd, rows: bd.rows + 1 };
+      spot = freeSpot(out, bd, ids.length);
+    }
+    ids.forEach((id, i) => { out[id] = [spot.row, spot.start + i]; });
+  }
+  return { layout: out, board: bd };
+}

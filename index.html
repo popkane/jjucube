@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#17402f">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<title>루미뀨브</title>
+<title>쭈큐브</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -14,8 +14,8 @@
 <!-- 시작 화면 -->
 <section id="home" class="screen">
   <div class="home-inner">
-    <h1 class="logo" aria-label="루미뀨브">
-      <span class="tile c-r"><span>루</span></span><span class="tile c-b"><span>미</span></span><span class="tile c-y"><span>뀨</span></span><span class="tile c-k"><span>브</span></span>
+    <h1 class="logo" aria-label="쭈큐브">
+      <span class="tile c-r"><span>쭈</span></span><span class="tile c-b"><span>큐</span></span><span class="tile c-y"><span>브</span></span>
     </h1>
 
     <div id="homeMain" class="stack">
@@ -24,6 +24,7 @@
         <input id="myName" class="text-input" maxlength="8" placeholder="이름">
       </label>
       <button id="resumeBtn" class="btn primary wide" hidden>이어하기</button>
+      <button id="resumeCpuBtn" class="btn primary wide" hidden>컴퓨터전 이어하기</button>
       <div class="modes">
         <button class="mode-card" id="createCard">
           <b>방 만들기</b><small>방 번호를 만들어 상대에게 알려줘요 (2~4명)</small>
@@ -31,8 +32,8 @@
         <button class="mode-card" id="joinCard">
           <b>방 들어가기</b><small>받은 방 번호 4자리를 넣어요</small>
         </button>
-        <button class="mode-card" disabled>
-          <b>컴퓨터와 1:1</b><small>준비 중</small>
+        <button class="mode-card" id="cpuCard">
+          <b>컴퓨터와 1:1</b><small>혼자 연습해요 (초보·중수·고수)</small>
         </button>
       </div>
     </div>
@@ -60,6 +61,23 @@
         <input id="joinCode" class="text-input code-input" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="0000" autocomplete="off">
       </label>
       <button type="submit" class="btn primary wide">들어가기</button>
+      <button type="button" class="btn ghost wide back-btn">뒤로</button>
+    </form>
+
+    <form id="cpuForm" class="stack" hidden>
+      <div class="field">
+        <span class="label">컴퓨터 실력</span>
+        <div class="seg" data-name="level">
+          <button type="button" data-v="easy" class="on">초보</button><button type="button" data-v="normal">중수</button><button type="button" data-v="hard">고수</button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="label">한 차례 제한 시간</span>
+        <div class="seg" data-name="seconds">
+          <button type="button" data-v="60" class="on">60초</button><button type="button" data-v="90">90초</button><button type="button" data-v="120">120초</button>
+        </div>
+      </div>
+      <button type="submit" class="btn primary wide">시작</button>
       <button type="button" class="btn ghost wide back-btn">뒤로</button>
     </form>
 

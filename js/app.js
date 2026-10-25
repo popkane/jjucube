@@ -1,17 +1,19 @@
-// 루미뀨브 화면. 규칙 판단은 engine.js, 바닥 배치는 board.js, 온라인은 net.js에 맡기고
-// 여기서는 그리기·조작·타이머만 한다. 각자 자기 폰으로 같은 방에 들어와서 한다.
+// 쭈큐브 화면. 규칙 판단은 engine.js, 바닥 배치는 board.js, 온라인은 net.js, 컴퓨터 상대는 ai.js에 맡기고
+// 여기서는 그리기·조작·타이머만 한다. 온라인은 각자 자기 폰으로 같은 방에 들어와서 하고, 컴퓨터전은 폰 안에서만 돈다.
 import {
   newGame, validateTurn, submitTurn, drawTile, penalize, analyzeSet, sortRack, tileOf, rackValue,
   TURN_SECONDS_OPTIONS, MIN_PLAYERS,
 } from './engine.js';
-import { DEFAULT_BOARD, segments, tableOf, findPlacement, place, tidy, blockOrder } from './board.js';
+import { DEFAULT_BOARD, segments, tableOf, findPlacement, place, tidy, blockOrder, arrangeTable } from './board.js';
+import { aiMove, LEVELS } from './ai.js';
 import { playTile, unlockAudio, setSoundEnabled } from './sound.js';
 import {
   signIn, serverNow, seatList, createRoom, joinRoom, markOnline, watchRoom, startRoom, commitSync, setLive,
 } from './net.js';
 
 const $ = (sel) => document.querySelector(sel);
-const KEY = { sort: 'rumikyub.sort', sound: 'rumikyub.sound', name: 'rumikyub.name', room: 'rumikyub.room', setup: 'rumikyub.setup' };
+const KEY = { sort: 'rumikyub.sort', sound: 'rumikyub.sound', name: 'rumikyub.name', room: 'rumikyub.room', setup: 'rumikyub.setup', cpu: 'rumikyub.cpu' };
+const CPU = 1; // 컴퓨터전에서 컴퓨터 자리 (나는 0)
 const RATIO = 1.36; // 타일 세로/가로
 const STALL_MS = 5000; // 차례인 사람이 시간 넘기고도 이만큼 반응이 없으면 다른 사람이 대신 벌칙 처리
 
@@ -26,7 +28,9 @@ const JOKER_SVG = '<svg viewBox="0 0 24 24" aria-label="조커"><circle cx="12" 
 
 // ---------- 상태 ----------
 let uid = null;
-let room = null;            // { code, seat, unwatch }
+let mode = null;            // 'online' | 'cpu'
+let cpuLevel = 'easy';
+let room = null;            // { code, seat, unwatch } — 컴퓨터전은 { seat: 0 }
 let roomData = null;        // 마지막으로 받은 방 전체
 let rev = -1;               // 지금 보고 있는 게임 버전 (sync.rev)
 let game = null;            // 엔진 상태 + 바닥 배치(layout, board)
@@ -45,7 +49,7 @@ let busy = false;           // 서버에 올리는 중
 let firedRev = -1;          // 시간 초과 처리를 이 버전에서 이미 했는지
 let sortBy = store.get(KEY.sort) === 'color' ? 'color' : 'number';
 let geo = null;             // 지금 그려진 바닥의 크기 { w, h, rows, cols, el, preview }
-const setup = { players: 2, seconds: 60, ...store.get(KEY.setup) };
+const setup = { players: 2, seconds: 60, level: 'easy', ...store.get(KEY.setup) };
 
 const me = () => room?.seat ?? -1;
 const isMyTurn = () => !!game && game.status === 'playing' && game.current === me();
@@ -54,7 +58,7 @@ const playedCount = () => (work && turnStart ? turnStart.rack.length - work.rack
 const canAct = () => isMyTurn() && !busy && !!work && workTurn === game.turn && $('#menu').hidden;
 const lockedIds = () => (game.melded[me()] ? null : startTableIds);
 const usedRows = (layout) => Object.values(layout).reduce((m, [r]) => Math.max(m, r + 1), 0);
-const isHost = () => roomData?.meta?.host === uid;
+const isHost = () => mode === 'cpu' || roomData?.meta?.host === uid;
 
 function showScreen(id) {
   for (const s of ['#home', '#lobby', '#game']) $(s).hidden = s !== id;
@@ -71,9 +75,13 @@ function showHome() {
   $('#homeMain').hidden = false;
   $('#createForm').hidden = true;
   $('#joinForm').hidden = true;
+  $('#cpuForm').hidden = true;
   const saved = store.get(KEY.room);
   $('#resumeBtn').hidden = !saved;
   if (saved) $('#resumeBtn').textContent = `이어하기 (방 ${saved})`;
+  const cpuSaved = store.get(KEY.cpu);
+  $('#resumeCpuBtn').hidden = !cpuSaved;
+  if (cpuSaved) $('#resumeCpuBtn').textContent = `컴퓨터전 이어하기 (${LEVELS[cpuSaved.level]})`;
 }
 
 function renderSegs() {
@@ -86,7 +94,8 @@ for (const seg of document.querySelectorAll('.seg')) {
   seg.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
-    setup[seg.dataset.name] = Number(b.dataset.v);
+    const v = b.dataset.v;
+    setup[seg.dataset.name] = /^\d+$/.test(v) ? Number(v) : v;
     renderSegs();
   });
 }
@@ -101,6 +110,11 @@ $('#joinCard').addEventListener('click', () => {
   $('#joinForm').hidden = false;
   $('#joinCode').value = '';
   $('#joinCode').focus();
+});
+$('#cpuCard').addEventListener('click', () => {
+  $('#homeMain').hidden = true;
+  $('#cpuForm').hidden = false;
+  renderSegs();
 });
 for (const b of document.querySelectorAll('.back-btn')) b.addEventListener('click', showHome);
 
@@ -128,16 +142,72 @@ $('#resumeBtn').addEventListener('click', () => {
   });
 });
 
+// ---------- 컴퓨터전 ----------
+$('#cpuForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (!TURN_SECONDS_OPTIONS.includes(setup.seconds)) setup.seconds = 60;
+  if (!LEVELS[setup.level]) setup.level = 'easy';
+  store.set(KEY.setup, setup);
+  startCpu(setup.level, setup.seconds);
+});
+$('#resumeCpuBtn').addEventListener('click', () => {
+  const saved = store.get(KEY.cpu);
+  if (!saved) { showHome(); return; }
+  enterCpu(saved.level);
+  // 저장해 둔 판을 이어서 — 제한 시간은 새로 시작
+  applyState({ game: saved.game, match: saved.match, deadline: serverNow() + saved.game.config.turnSeconds * 1000 });
+});
+
+function enterCpu(level) {
+  leaveRoom(false);
+  mode = 'cpu';
+  cpuLevel = level;
+  room = { seat: 0 };
+  names = [myName(), `컴퓨터(${LEVELS[level]})`];
+}
+
+function startCpu(level, seconds) {
+  enterCpu(level);
+  const g = freshGame(2, seconds);
+  applyState({ game: g, match: { rounds: 0, totals: [0, 0] }, deadline: serverNow() + seconds * 1000 });
+}
+
+// 컴퓨터 차례: 잠깐 생각하는 척하고 둔다 (생각하는 동안 화면이 멈추지 않게 그린 뒤에 계산)
+let cpuTimer = 0;
+function scheduleCpu() {
+  clearTimeout(cpuTimer);
+  const atRev = rev;
+  cpuTimer = setTimeout(() => {
+    if (mode !== 'cpu' || rev !== atRev || !game || game.status !== 'playing' || game.current !== CPU) return;
+    const m = aiMove(game, CPU, cpuLevel);
+    if (m.action === 'play') {
+      const r = submitTurn(game, CPU, m.table);
+      if (r.ok) {
+        const { layout, board } = arrangeTable(game.layout, game.board, m.table);
+        const n = r.state.last.count;
+        playTile(n > 1 ? 'snap' : 'place', n);
+        commit({ ...r.state, layout, board });
+        return;
+      }
+    }
+    commit(drawTile(game, CPU));
+  }, 900 + Math.random() * 900);
+}
+
 // ---------- 방 ----------
 function enterRoom({ code, seat }) {
   leaveRoom(false);
+  mode = 'online';
   room = { code, seat, unwatch: watchRoom(code, onRoom), unonline: markOnline(code, seat) };
   store.set(KEY.room, code);
 }
 
 function leaveRoom(goHome = true) {
+  if (goHome) store.del(mode === 'cpu' ? KEY.cpu : KEY.room);
+  clearTimeout(cpuTimer);
   room?.unwatch?.();
   room?.unonline?.();
+  mode = null;
   room = null;
   roomData = null;
   rev = -1;
@@ -162,24 +232,9 @@ function onRoom(data) {
 
   const sync = data.sync;
   if (sync.rev !== rev) {
-    rev = sync.rev;
-    game = JSON.parse(sync.game);
-    match = JSON.parse(sync.match);
-    deadline = sync.deadline;
-    names = Array.from({ length: game.players }, (_, i) => seats[i]?.name || `플레이어${i + 1}`);
-    startTableIds = new Set(game.table.flat());
-    busy = false;
-    if (live && live.turn !== game.turn) live = null;
-    showScreen('#game');
-    if (game.status === 'ended') {
-      work = null;
-      workTurn = null;
-      showEnd();
-    } else {
-      $('#end').hidden = true;
-      if (isMyTurn() && workTurn !== game.turn) beginTurn();
-      if (!isMyTurn()) { work = null; workTurn = null; }
-    }
+    const g = JSON.parse(sync.game);
+    names = Array.from({ length: g.players }, (_, i) => seats[i]?.name || `플레이어${i + 1}`);
+    applyState({ game: g, match: JSON.parse(sync.match), deadline: sync.deadline }, sync.rev, false);
   }
 
   // 상대가 만지는 중인 테이블 (내 차례면 무시)
@@ -193,6 +248,32 @@ function onRoom(data) {
   }
   if (!press) render(); // 끄는 도중에는 다시 그리지 않음 (끝나면 그림)
   else renderPlayers();
+}
+
+// 새 게임 상태 반영 (온라인은 서버에서 받은 것, 컴퓨터전은 방금 둔 것)
+function applyState(s, newRev = rev + 1, draw = true) {
+  rev = newRev;
+  game = s.game;
+  match = s.match;
+  deadline = s.deadline;
+  startTableIds = new Set(game.table.flat());
+  busy = false;
+  if (live && live.turn !== game.turn) live = null;
+  showScreen('#game');
+  if (game.status === 'ended') {
+    work = null;
+    workTurn = null;
+    showEnd();
+  } else {
+    $('#end').hidden = true;
+    if (isMyTurn() && workTurn !== game.turn) beginTurn();
+    if (!isMyTurn()) { work = null; workTurn = null; }
+  }
+  if (mode === 'cpu') {
+    store.set(KEY.cpu, { game, match, level: cpuLevel });
+    if (game.status === 'playing' && game.current === CPU) scheduleCpu();
+  }
+  if (draw) render();
 }
 
 function renderLobby(seats) {
@@ -251,7 +332,9 @@ async function commit(next, quiet = false) {
   if (next.status === 'ended' && game.status !== 'ended') {
     m = { rounds: match.rounds + 1, totals: match.totals.map((t, i) => t + next.scores[i]) };
   }
-  const sync = { game: JSON.stringify(next), match: JSON.stringify(m), deadline: serverNow() + next.config.turnSeconds * 1000 };
+  const nextDeadline = serverNow() + next.config.turnSeconds * 1000;
+  if (mode === 'cpu') { applyState({ game: next, match: m, deadline: nextDeadline }); return; }
+  const sync = { game: JSON.stringify(next), match: JSON.stringify(m), deadline: nextDeadline };
   try {
     const ok = await commitSync(room.code, rev, sync);
     if (!ok) { busy = false; if (!quiet) toast('다른 변경이 먼저 들어왔어요'); render(); }
@@ -295,7 +378,7 @@ function describeLast() {
 let liveTimer = 0;
 let lastSnap = false;
 function sendLive(snap = false) {
-  if (!room || !isMyTurn()) return;
+  if (mode !== 'online' || !isMyTurn()) return;
   lastSnap = snap;
   clearTimeout(liveTimer);
   liveTimer = setTimeout(() => {
@@ -317,11 +400,13 @@ function tick() {
   const shown = Math.max(0, Math.min(total, left));
   bar.style.width = `${(shown / total) * 100}%`;
   bar.classList.toggle('warn', shown <= 10000);
-  $('#timerText').textContent = `${isMyTurn() ? '내 차례' : names[game.current]} ${Math.ceil(shown / 1000)}초`;
+  $('#timerText').textContent = mode === 'cpu' && !isMyTurn()
+    ? '컴퓨터 생각 중…'
+    : `${isMyTurn() ? '내 차례' : names[game.current]} ${Math.ceil(shown / 1000)}초`;
   if (firedRev === rev || busy) return;
   if (isMyTurn() && left <= 0) { firedRev = rev; timeUp(); }
   // 차례인 사람이 연결이 끊겨 멈춰 있으면 다른 사람이 대신 벌칙 처리 (rev 확인으로 한 번만 들어감)
-  else if (!isMyTurn() && left <= -STALL_MS) { firedRev = rev; commit(penalize(game, game.current), true); }
+  else if (mode === 'online' && !isMyTurn() && left <= -STALL_MS) { firedRev = rev; commit(penalize(game, game.current), true); }
 }
 
 // ---------- 타일 옮기기 ----------
@@ -399,7 +484,7 @@ function renderPlayers() {
   if (!game) return;
   const box = $('#players');
   box.innerHTML = '';
-  const online = roomData?.online || {};
+  const online = mode === 'cpu' ? { 0: true, 1: true } : roomData?.online || {};
   names.forEach((name, p) => {
     let count = game.racks[p].length;
     if (p === me() && work) count = work.rack.length;
@@ -542,7 +627,8 @@ setSoundEnabled(soundOn);
 const renderSoundBtn = () => { $('#soundBtn').textContent = `소리: ${soundOn ? '켜짐' : '꺼짐'}`; };
 $('#menuBtn').addEventListener('click', () => {
   renderSoundBtn();
-  $('#menuRoom').textContent = room ? `방 번호 ${room.code}` : '';
+  $('#menuRoom').textContent = mode === 'cpu' ? `컴퓨터전 (${LEVELS[cpuLevel]})` : room ? `방 번호 ${room.code}` : '';
+  $('#menuQuit').textContent = mode === 'cpu' ? '그만하기' : '방 나가기';
   $('#menu').hidden = false;
 });
 $('#menuClose').addEventListener('click', () => { $('#menu').hidden = true; render(); });
@@ -573,13 +659,22 @@ function showEnd() {
   });
   $('#againBtn').hidden = !isHost();
   $('#againInfo').hidden = isHost();
+  $('#homeBtn').textContent = mode === 'cpu' ? '그만하기' : '방 나가기';
   $('#end').hidden = false;
 }
-$('#againBtn').addEventListener('click', () => withConn(async () => {
+$('#againBtn').addEventListener('click', () => {
+  if (mode === 'cpu') {
+    const g = freshGame(2, game.config.turnSeconds);
+    applyState({ game: g, match, deadline: serverNow() + g.config.turnSeconds * 1000 });
+    return;
+  }
+  againOnline();
+});
+const againOnline = () => withConn(async () => {
   const g = freshGame(game.players, game.config.turnSeconds);
   const ok = await commitSync(room.code, rev, { game: JSON.stringify(g), match: JSON.stringify(match), deadline: serverNow() + g.config.turnSeconds * 1000 });
   if (ok) setLive(room.code, null).catch(() => {});
-}));
+});
 $('#homeBtn').addEventListener('click', () => leaveRoom());
 
 // ---------- 끌기 / 누르기 ----------
