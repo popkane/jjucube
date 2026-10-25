@@ -98,6 +98,44 @@ export function findPlacement(layout, board, ids, at, locked = null) {
       if (!best || cand.score < best.score || (cand.score === best.score && best.merge && !cand.merge)) best = cand;
     }
   }
+  // 조합 옆에 붙일 자리가 없을 때(바로 옆에 다른 조합이 있어서 닿아 버리는 경우):
+  // 조합되는 묶음이면 그 조합을 통째로 옆으로 밀거나 빈 곳으로 옮겨서 붙인다
+  for (const seg of segments(without(layout, ids))) {
+    if (locked && seg.ids.some((id) => locked.has(id))) continue;
+    const merged = [...seg.ids, ...block];
+    if (!couldBeSet(merged)) continue;
+    const spot = relocateSpot(g, board, seg, merged.length);
+    if (!spot) continue;
+    const end = seg.start + seg.ids.length - 1;
+    const dr = Math.abs(seg.row - at.row) * ROW_WEIGHT;
+    const dc = at.col < seg.start ? seg.start - at.col : at.col > end ? at.col - end : 0;
+    // 제자리에서 붙일 수 있으면 그쪽이 먼저 (옮기는 건 조금 손해로 침)
+    const cand = { row: spot.row, start: spot.start, order: setOrder(merged), merge: true, score: dr + dc - SNAP + 0.5 };
+    if (!best || cand.score < best.score) best = cand;
+  }
+  return best;
+}
+
+// 조합 seg를 길이 m으로 늘려 놓을 자리: 오른쪽으로 늘리기 → 왼쪽으로 늘리기 → 가장 가까운 빈 곳 (양옆 한 칸은 비워야 함)
+function relocateSpot(g, board, seg, m) {
+  const own = new Set(seg.ids);
+  const isFree = (r, c) => c >= 0 && c < board.cols && (g[r][c] === null || own.has(g[r][c]));
+  const fits = (r, s) => {
+    if (s < 0 || s + m > board.cols) return false;
+    for (let c = s; c < s + m; c++) if (!isFree(r, c)) return false;
+    return (s === 0 || isFree(r, s - 1)) && (s + m === board.cols || isFree(r, s + m));
+  };
+  const end = seg.start + seg.ids.length - 1;
+  if (fits(seg.row, seg.start)) return { row: seg.row, start: seg.start };
+  if (fits(seg.row, end - m + 1)) return { row: seg.row, start: end - m + 1 };
+  let best = null;
+  for (let r = 0; r < board.rows; r++) {
+    for (let s = 0; s + m <= board.cols; s++) {
+      if (!fits(r, s)) continue;
+      const d = Math.abs(r - seg.row) * ROW_WEIGHT + Math.abs(s - seg.start);
+      if (!best || d < best.d) best = { row: r, start: s, d };
+    }
+  }
   return best;
 }
 
