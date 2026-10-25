@@ -679,14 +679,14 @@ function renderRack() {
   const x = (c) => c * (w + gap);
   const y = (r) => r * (h + gap);
   const mine = canAct();
-  // 원목 받침대: 뒤판(윗단) + 앞판(아랫단 타일 아래쪽을 살짝 가림)
+  // 원목 받침대: 뒤판(윗단 받침) + 앞판(아랫단 받침). 둘 다 타일 뒤에 있어서 타일을 가리지 않는다
   const back = document.createElement('div');
   back.className = 'rack-back';
-  Object.assign(back.style, { top: `${h * 0.45}px`, height: `${y(1) + h * 0.8 - h * 0.45}px` }); // 앞판 뒤까지 이어지게
+  Object.assign(back.style, { top: `${h * 0.3}px`, height: `${y(1) + h * 0.5 - h * 0.3}px` });
   grid.append(back);
   const front = document.createElement('div');
   front.className = 'rack-front';
-  Object.assign(front.style, { top: `${y(1) + h * 0.72}px`, height: `${h * 0.48}px` });
+  Object.assign(front.style, { top: `${y(1) + h * 0.3}px`, height: `${h * 0.7 + 10}px` });
   front.innerHTML = '<span>강릉큐브</span>';
   grid.append(front);
   for (const g of rackGroups(rackPos)) {

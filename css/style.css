@@ -193,7 +193,7 @@ body.framed #stage { border-radius: 26px; box-shadow: 0 0 0 5px var(--ink), 0 14
 .avatar svg { width: 88%; height: 88%; margin-top: 6%; }
 
 /* 가운데: 위는 테이블(모래사장), 아래는 바다 위 받침대 */
-.center { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--sea); }
+.center { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--sand); }
 .table-wrap { flex: 1; min-height: 0; position: relative; display: flex; background: var(--sand); }
 .table {
   flex: 1; overflow: auto; padding: 6px 8px 10px;
@@ -212,27 +212,27 @@ body.framed #stage { border-radius: 26px; box-shadow: 0 0 0 5px var(--ink), 0 14
 .preview.push::before { content: ""; position: absolute; left: -5px; top: -4px; bottom: -4px; width: 4px; border-radius: 2px; background: var(--good); }
 .board-hint { position: absolute; inset: 0; display: grid; place-items: center; color: #a07a45; font-size: 17px; text-align: center; padding: 0 24px; pointer-events: none; }
 .tidy-btn {
-  position: absolute; right: 8px; bottom: 8px; border: 2.5px solid var(--ink); border-radius: 999px; padding: 4px 10px;
+  position: absolute; right: 14px; top: 8px; z-index: 6; border: 2.5px solid var(--ink); border-radius: 999px; padding: 4px 10px;
   background: #fff; box-shadow: 0 3px 0 var(--ink); font-size: 13px; cursor: pointer;
 }
 .tidy-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
 
-/* 테이블과 바다 사이 물결 + 안내 문구 + 남은 시간 */
-.status-row { position: relative; display: flex; align-items: center; gap: 10px; padding: 5px 10px 3px; }
-.status-row::before {
-  content: ""; position: absolute; left: 0; right: 0; top: -12px; height: 13px; pointer-events: none;
-  background: radial-gradient(circle at 10px 14px, var(--sea) 8px, var(--ink) 8.5px, var(--ink) 11px, transparent 11.5px) 0 0 / 20px 13px repeat-x;
+/* 안내 문구 + 남은 시간: 테이블 아래쪽(받침대 바로 위)에 작게 겹쳐서 */
+.status-row { position: absolute; left: 10px; right: 10px; bottom: 158px; z-index: 6; display: flex; align-items: center; gap: 10px; pointer-events: none; }
+.status {
+  flex: 0 1 auto; min-width: 0; font-size: 13px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: rgba(255, 255, 255, 0.85); border: 2px solid var(--ink); border-radius: 999px; padding: 2px 10px;
 }
-.status { flex: 1; min-width: 0; font-size: 14px; color: #fff; text-shadow: 0 1.5px 0 rgba(0, 0, 0, 0.25); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.status.ok { color: #eaffd0; }
-.status.err { color: #fff0b3; }
-.timer { position: relative; width: 170px; height: 14px; border-radius: 999px; background: rgba(255, 255, 255, 0.55); border: 2.5px solid var(--ink); overflow: hidden; flex: none; }
+.status:empty { display: none; }
+.status.ok { background: #e4ffe9; }
+.status.err { background: #fff0f0; }
+.timer { position: relative; margin-left: auto; width: 150px; height: 14px; border-radius: 999px; background: rgba(255, 255, 255, 0.55); border: 2.5px solid var(--ink); overflow: hidden; flex: none; }
 .timer-bar { height: 100%; width: 100%; background: var(--sun); transition: width 0.25s linear; }
 .timer-bar.warn { background: var(--coral); }
 .timer-text { position: absolute; right: 8px; top: 0; font-size: 10px; line-height: 9px; color: var(--ink); }
 
 /* 받침대 = 원목 받침대 2층 (뒤판 윗단에 1층, 앞판 아랫단에 2층. 타일은 놓은 자리 그대로) */
-.rack { position: relative; height: 150px; margin: 0 22px 2px; padding: 6px 12px 16px; flex: none; }
+.rack { position: relative; height: 158px; margin: 0 22px; padding: 8px 12px 14px; flex: none; }
 .rack-grid { position: relative; margin: 0 auto; }
 .rack-grid .tile { position: absolute; z-index: 2; }
 .rack-back {
@@ -240,7 +240,7 @@ body.framed #stage { border-radius: 26px; box-shadow: 0 0 0 5px var(--ink), 0 14
   background: linear-gradient(#c99460, #a56c3a); border: 3px solid var(--ink); border-radius: 12px 12px 6px 6px;
 }
 .rack-front {
-  position: absolute; left: -20px; right: -20px; z-index: 3; pointer-events: none;
+  position: absolute; left: -20px; right: -20px; z-index: 1; pointer-events: none;
   display: flex; align-items: center; justify-content: flex-end; padding-right: 16px;
   background: linear-gradient(#f3cf9f, #d9a26a); border: 3px solid var(--ink); border-radius: 10px; box-shadow: 0 4px 0 var(--ink);
 }

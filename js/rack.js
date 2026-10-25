@@ -3,12 +3,12 @@
 import { analyzeSet, sortRack, tileOf } from './engine.js';
 
 export const RACK_ROWS = 2;
-export const BASE_COLS = 14; // 가로 화면 기준
+export const BASE_COLS = 12; // 가로 화면 기준 (타일을 크게)
 
 const rowOf = (pos, r) => Object.entries(pos).filter(([, [rr]]) => rr === r).map(([id, [, c]]) => [Number(id), c]).sort((a, b) => a[1] - b[1]);
 const lastCol = (pos, r) => rowOf(pos, r).reduce((m, [, c]) => Math.max(m, c), -1);
 
-// 칸 수: 기본 14칸. 줄마다 빈칸이 2칸 이상 남도록 늘린다 (그만큼 타일이 작아짐)
+// 칸 수: 기본 12칸. 줄마다 빈칸이 2칸 이상 남도록 늘린다 (그만큼 타일이 작아짐)
 export function rackCols(pos) {
   const n = Object.keys(pos).length;
   let maxCol = -1;
