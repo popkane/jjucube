@@ -18,6 +18,12 @@ export function unlockAudio() {
   if (ctx.state === 'suspended') ctx.resume();
 }
 
+// 소리 장치가 실제로 켜질 때까지 기다림 (휴대폰은 첫 터치 직후 잠깐 꺼져 있음)
+export function whenReady() {
+  unlockAudio();
+  return ctx && ctx.state !== 'running' ? ctx.resume().catch(() => {}) : Promise.resolve();
+}
+
 // 딱: 짧은 잡음을 좁은 대역으로 걸러 빠르게 줄인다
 function click(t, freq, gain, decay) {
   const src = ctx.createBufferSource();

@@ -33,7 +33,7 @@
   <button data-s="win">🏆 승리<small>내가 이겼을 때 / 다른 사람이 이겼을 때</small></button>
 </div>
 <script type="module">
-  import * as S from './js/sound.js?v=preview2';
+  import * as S from './js/sound.js?v=preview3';
   let stop = () => {};
   const play = {
     clock: () => { stop(); stop = S.startClock(5000); },
@@ -48,9 +48,8 @@
   document.querySelector('.list').addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
-    S.unlockAudio();
-    // 휴대폰은 첫 터치 때 소리 장치가 켜지는 데 잠깐 걸려서 아주 조금 늦게 재생
-    setTimeout(play[b.dataset.s], 60);
+    // 휴대폰은 첫 터치 때 소리 장치가 켜지는 데 잠깐 걸려서, 켜진 뒤에 재생
+    S.whenReady().then(play[b.dataset.s]);
   });
 </script>
 </body>
