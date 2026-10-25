@@ -114,11 +114,22 @@ function goFullscreen(quiet = false) {
     .then(() => screen.orientation?.lock?.('landscape').catch(() => {}))
     .catch(() => { if (!quiet) toast('전체화면을 열지 못했어요'); });
 }
-function syncFullBtns() {
-  const hide = isStandalone() || !!document.fullscreenElement;
-  for (const id of ['#fullBtn', '#menuFull']) { const b = $(id); if (b) b.hidden = hide; }
+// 전체화면 버튼은 계속 보이고, 누를 때마다 전체화면 ↔ 일반화면 (홈 화면 앱으로 연 경우만 숨김)
+function toggleFullscreen() {
+  if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+  else goFullscreen();
 }
-document.addEventListener('fullscreenchange', () => { fitStage(); if (game && !$('#game').hidden) render(); });
+function syncFullBtns() {
+  const full = !!document.fullscreenElement;
+  for (const id of ['#fullBtn', '#gameFullBtn']) {
+    const b = $(id);
+    if (!b) continue;
+    b.hidden = isStandalone();
+    b.classList.toggle('on', full);
+    b.innerHTML = `<span class="fs-ic">${full ? '⤡' : '⤢'}</span><span>${full ? '일반화면' : '전체화면'}</span>`;
+  }
+}
+document.addEventListener('fullscreenchange', () => { fitStage(); syncFullBtns(); if (game && !$('#game').hidden) render(); });
 // 화면 좌표 → 틀 안 좌표
 function toStage(x, y) {
   const dx = x - innerWidth / 2;
@@ -144,8 +155,8 @@ function stagePos(el) {
 }
 fitStage();
 addEventListener('resize', () => { fitStage(); if (!press && game && !$('#game').hidden) render(); });
-$('#fullBtn').addEventListener('click', () => goFullscreen());
-$('#menuFull').addEventListener('click', () => { goFullscreen(); $('#menu').hidden = true; render(); });
+$('#fullBtn').addEventListener('click', toggleFullscreen);
+$('#gameFullBtn').addEventListener('click', toggleFullscreen);
 // 폰에서 게임을 시작하는 버튼을 누르면 자동으로 전체화면을 시도한다
 document.addEventListener('click', (e) => {
   if (isTouch && e.target.closest('#resumeBtn, #resumeCpuBtn, #startBtn, #againBtn, #createForm [type=submit], #joinForm [type=submit], #cpuForm [type=submit]')) goFullscreen(true);
@@ -592,7 +603,8 @@ function moveTiles(ids, dest) {
       sendLive();
     }
     ensureRack();
-    rackPos = dest.spot ? placeInRack(rackPos, ids, dest.spot) : insertIntoRack(rackPos, ids, 0, 999);
+    if (dest.insert) rackPos = insertIntoRack(rackPos, ids, dest.spot.row, dest.spot.start);
+    else rackPos = dest.spot ? placeInRack(rackPos, ids, dest.spot) : insertIntoRack(rackPos, ids, 0, 999);
     saveRack();
     playTile('rack', ids.length);
     render();
@@ -984,8 +996,14 @@ function findDrop(pt, ids, grab) {
     const o = stagePos(rackGeo.el);
     const cell = rackGeo.w + rackGeo.gap;
     const at = { colF: (firstX - o.x + rackGeo.gap / 2) / cell, rowF: (pt.sy - o.y) / (rackGeo.h + rackGeo.gap) };
-    const spot = nearestFreeSlot(rackPos, ids, at, rackGeo.cols + 2);
-    return spot ? { type: 'rack', spot } : { type: 'rack', spot: null };
+    // 손가락 아래 칸이 비어 있으면 그 칸에, 타일이 있으면 그 자리에 끼워 넣고 옆 타일을 오른쪽으로 민다
+    const row = Math.min(RACK_ROWS - 1, Math.max(0, Math.floor(at.rowF)));
+    const col = Math.max(0, Math.floor(at.colF));
+    const moving = new Set(ids);
+    const taken = new Set(Object.entries(rackPos).filter(([id]) => !moving.has(Number(id))).map(([, [r, c]]) => `${r}:${c}`));
+    let insert = false;
+    for (let c = col; c < col + ids.length; c++) if (taken.has(`${row}:${c}`)) insert = true;
+    return { type: 'rack', spot: { row, start: col }, insert };
   }
   if (el.closest('#table') && canAct()) {
     const o = stagePos(geo.el);
@@ -1009,6 +1027,7 @@ function showTarget(dest, ids, pt) {
     Object.assign(bt.style, { left: `${dest.spot.start * geo.w}px`, top: `${dest.spot.row * geo.h}px`, width: `${ids.length * geo.w}px`, height: `${geo.h}px` });
   } else if (dest?.type === 'rack' && dest.spot) {
     const cell = rackGeo.w + rackGeo.gap;
+    rt.classList.toggle('insert', !!dest.insert); // 끼워 넣기: 그 자리 왼쪽에 막대
     Object.assign(rt.style, { left: `${dest.spot.start * cell}px`, top: `${dest.spot.row * (rackGeo.h + rackGeo.gap)}px`, width: `${ids.length * cell - rackGeo.gap}px`, height: `${rackGeo.h}px` });
   }
 }

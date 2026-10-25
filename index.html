@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
-<link rel="stylesheet" href="css/style.css?v=202610252250">
+<link rel="stylesheet" href="css/style.css?v=202610252255">
 </head>
 <body>
 <!-- 모든 화면은 가로형 틀 하나(#stage) 안에. 창 크기에 맞춰 커지고, 폰을 세로로 들면 돌아간다 -->
@@ -178,6 +178,7 @@
       <button id="sortRunBtn" class="sort-btn" title="같은 색 연속끼리 정렬">789</button>
       <button id="sortGroupBtn" class="sort-btn" title="같은 숫자끼리 정렬">777</button>
     </div>
+    <button id="gameFullBtn" class="full-toggle" aria-label="전체화면 켜고 끄기"></button>
     <div class="actions">
       <button id="undoBtn" class="round-btn" aria-label="되돌리기" hidden></button>
       <button id="mainBtn" class="main-btn draw" aria-label="1장 받기 / 끝내기"></button>
@@ -192,7 +193,6 @@
     <h2>메뉴</h2>
     <p id="menuRoom" class="muted"></p>
     <button id="menuClose" class="btn primary wide">계속하기</button>
-    <button id="menuFull" class="btn wide">전체화면</button>
     <button id="soundBtn" class="btn wide sound-btn">소리: 켜짐</button>
     <button id="menuQuit" class="btn danger wide">방 나가기</button>
   </div>
@@ -231,15 +231,15 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/ai.js": "./js/ai.js?v=202610252250",
-    "./js/app.js": "./js/app.js?v=202610252250",
-    "./js/board.js": "./js/board.js?v=202610252250",
-    "./js/characters.js": "./js/characters.js?v=202610252250",
-    "./js/engine.js": "./js/engine.js?v=202610252250",
-    "./js/firebase-config.js": "./js/firebase-config.js?v=202610252250",
-    "./js/net.js": "./js/net.js?v=202610252250",
-    "./js/rack.js": "./js/rack.js?v=202610252250",
-    "./js/sound.js": "./js/sound.js?v=202610252250"
+    "./js/ai.js": "./js/ai.js?v=202610252255",
+    "./js/app.js": "./js/app.js?v=202610252255",
+    "./js/board.js": "./js/board.js?v=202610252255",
+    "./js/characters.js": "./js/characters.js?v=202610252255",
+    "./js/engine.js": "./js/engine.js?v=202610252255",
+    "./js/firebase-config.js": "./js/firebase-config.js?v=202610252255",
+    "./js/net.js": "./js/net.js?v=202610252255",
+    "./js/rack.js": "./js/rack.js?v=202610252255",
+    "./js/sound.js": "./js/sound.js?v=202610252255"
   }
 }
 </script>
@@ -254,6 +254,6 @@
     if (el && el.textContent === '연결 중…') el.textContent = '연결이 오래 걸려요. 새로고침해 보시고, 카톡 안에서 열었다면 크롬·사파리로 열어 주세요';
   }, 10000);
 </script>
-<script type="module" src="js/app.js?v=202610252250"></script>
+<script type="module" src="js/app.js?v=202610252255"></script>
 </body>
 </html>
