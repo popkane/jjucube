@@ -988,14 +988,18 @@ let press = null;
 
 // 끄는 묶음의 첫 타일 중심(틀 좌표) → 놓을 곳 { type, spot }
 function findDrop(pt, ids, grab) {
-  const el = document.elementFromPoint(pt.x, pt.y);
+  // 받침대는 손가락 바로 아래 기준 (떠 있는 타일은 손가락보다 위라 받침대 밖일 수 있음), 테이블은 떠 있는 타일 기준
+  const underFinger = document.elementFromPoint(pt.fx, pt.fy);
+  const onRack = underFinger?.closest('#rack');
+  const el = onRack ? underFinger : document.elementFromPoint(pt.x, pt.y);
   if (!el) return null;
   const firstX = pt.sx - grab * press.pitch;
   if (el.closest('#rack')) {
     if (!rackGeo) return null;
     const o = stagePos(rackGeo.el);
     const cell = rackGeo.w + rackGeo.gap;
-    const at = { colF: (firstX - o.x + rackGeo.gap / 2) / cell, rowF: (pt.sy - o.y) / (rackGeo.h + rackGeo.gap) };
+    const sy = onRack ? pt.fsy : pt.sy;
+    const at = { colF: (firstX - o.x + rackGeo.gap / 2) / cell, rowF: (sy - o.y) / (rackGeo.h + rackGeo.gap) };
     // 손가락 아래 칸이 비어 있으면 그 칸에, 타일이 있으면 그 자리에 끼워 넣고 옆 타일을 오른쪽으로 민다
     const row = Math.min(RACK_ROWS - 1, Math.max(0, Math.floor(at.rowF)));
     const col = Math.max(0, Math.floor(at.colF));
@@ -1042,7 +1046,7 @@ function pointOf(e) {
   const s = toStage(e.clientX, e.clientY);
   const sy = s.y - (press?.touch ? Math.max(geo?.h || 40, 40) * 0.9 : 0);
   const c = fromStage(s.x, sy);
-  return { sx: s.x, sy, x: c.x, y: c.y };
+  return { sx: s.x, sy, x: c.x, y: c.y, fx: e.clientX, fy: e.clientY, fsy: s.y };
 }
 
 document.addEventListener('pointerdown', (e) => {
