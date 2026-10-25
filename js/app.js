@@ -1214,7 +1214,8 @@ function showTarget(dest, ids, pt) {
 // 손가락 위치 → 끄는 타일 위치 (틀 안 좌표 sx, sy) + 그 지점의 화면 좌표 (x, y: 놓을 곳 찾기용)
 function pointOf(e) {
   const s = toStage(e.clientX, e.clientY);
-  const sy = s.y; // 끄는 타일은 손가락 바로 밑 (위로 띄우지 않음)
+  // 폰: 끄는 타일을 손가락보다 살짝 위로 (손가락에 다 가려지지 않을 만큼만)
+  const sy = s.y - (press?.touch ? Math.max(geo?.h || 40, 40) * 0.45 : 0);
   const c = fromStage(s.x, sy);
   return { sx: s.x, sy, x: c.x, y: c.y, fx: e.clientX, fy: e.clientY, fsy: s.y };
 }
@@ -1252,9 +1253,19 @@ document.addEventListener('pointermove', (e) => {
   press.gx = pt.sx - press.grab * press.pitch - press.size / 2;
   press.gy = pt.sy - (press.size * RATIO) / 2;
   press.ghost.style.transform = `translate(${press.gx}px, ${press.gy}px)`;
-  press.dest = findDrop(pt, press.ids, press.grab);
-  showTarget(press.dest, press.ids, pt);
+  // 들어갈 자리가 바뀔 때만 다시 그린다. 경계에서 손가락이 조금 떨려 자리가 왔다 갔다 하면 깜빡이므로
+  // 지난번 자리가 바뀐 지점에서 칸 1/3 이상 움직였을 때만 바꾼다 (120Hz 폰은 움직임 이벤트가 아주 잦음)
+  const next = findDrop(pt, press.ids, press.grab);
+  const key = destKey(next, press.ids);
+  if (key === press.destKey) return;
+  const near = press.destAt && Math.hypot(pt.sx - press.destAt.x, pt.sy - press.destAt.y) < (geo?.w || 40) * 0.35;
+  if (near) return;
+  press.dest = next;
+  press.destKey = key;
+  press.destAt = { x: pt.sx, y: pt.sy };
+  showTarget(next, press.ids, pt);
 });
+const destKey = (d, ids) => (d ? JSON.stringify([d.type, d.spot?.row, d.spot?.start, !!(d.insert || d.spot?.insert), d.land ? ids.map((id) => d.land[id]) : 0]) : '');
 
 function endPress(e, cancelled) {
   if (!press) return;
