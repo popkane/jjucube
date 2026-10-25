@@ -1,4 +1,4 @@
-// 쭈큐브 화면. 규칙 판단은 engine.js, 바닥 배치는 board.js, 온라인은 net.js, 컴퓨터 상대는 ai.js에 맡기고
+// 강릉큐브 화면. 규칙 판단은 engine.js, 바닥 배치는 board.js, 온라인은 net.js, 컴퓨터 상대는 ai.js에 맡기고
 // 여기서는 그리기·조작·타이머만 한다. 온라인은 각자 자기 폰으로 같은 방에 들어와서 하고, 컴퓨터전은 폰 안에서만 돈다.
 import {
   newGame, validateTurn, submitTurn, drawTile, penalize, analyzeSet, sortRack, tileOf, rackValue,
@@ -24,7 +24,8 @@ const store = {
   del(k) { try { localStorage.removeItem(k); } catch { /* 무시 */ } },
 };
 
-const JOKER_SVG = '<svg viewBox="0 0 24 24" aria-label="조커"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2.4"/><circle cx="8.5" cy="10" r="1.7" fill="currentColor"/><circle cx="15.5" cy="10" r="1.7" fill="currentColor"/><path d="M7.5 14.5q4.5 4.2 9 0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
+// 조커 = 주문진 오징어
+const JOKER_SVG = '<svg viewBox="0 0 24 24" aria-label="조커"><path d="M12 1.5c4.2 3.8 6.4 7.2 6.4 11.8v2.2a2 2 0 0 1-2 2H7.6a2 2 0 0 1-2-2v-2.2C5.6 8.7 7.8 5.3 12 1.5z" fill="#ff8fa3" stroke="#2b2d42" stroke-width="1.4" stroke-linejoin="round"/><path d="M8.3 17.6v3.4M10.8 17.6v4.4M13.2 17.6v4.4M15.7 17.6v3.4" stroke="#2b2d42" stroke-width="1.6" stroke-linecap="round"/><circle cx="9.6" cy="12.6" r="1.4" fill="#2b2d42"/><circle cx="14.4" cy="12.6" r="1.4" fill="#2b2d42"/><path d="M10.7 14.8q1.3 1.1 2.6 0" fill="none" stroke="#2b2d42" stroke-width="1.1" stroke-linecap="round"/></svg>';
 
 // ---------- 상태 ----------
 let uid = null;
@@ -279,7 +280,7 @@ function applyState(s, newRev = rev + 1, draw = true) {
 function renderLobby(seats) {
   showScreen('#lobby');
   const meta = roomData.meta;
-  $('#lobbyCode').textContent = room.code;
+  $('#lobbyCode').innerHTML = [...room.code].map((d) => `<span>${d}</span>`).join('');
   const list = $('#lobbySeats');
   list.innerHTML = '';
   for (let i = 0; i < meta.players; i++) {

@@ -3,10 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="theme-color" content="#17402f">
+<meta name="theme-color" content="#9fe0ff">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<title>쭈큐브</title>
+<title>강릉큐브</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%2064%2064%22%3E%3Cpath%20d%3D%22M32%204c11%2010%2017%2019%2017%2031v6a5%205%200%200%201-5%205H20a5%205%200%200%201-5-5v-6C15%2023%2021%2014%2032%204z%22%20fill%3D%22%23ff8fa3%22%20stroke%3D%22%232b2d42%22%20stroke-width%3D%223%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cpath%20d%3D%22M17%2022%208%2027l8%204M47%2022l9%205-8%204%22%20fill%3D%22%23ff8fa3%22%20stroke%3D%22%232b2d42%22%20stroke-width%3D%223%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cpath%20d%3D%22M22%2046v10M28%2046v13M36%2046v13M42%2046v10%22%20stroke%3D%22%232b2d42%22%20stroke-width%3D%223.5%22%20stroke-linecap%3D%22round%22%2F%3E%3Ccircle%20cx%3D%2225%22%20cy%3D%2234%22%20r%3D%223.5%22%20fill%3D%22%232b2d42%22%2F%3E%3Ccircle%20cx%3D%2239%22%20cy%3D%2234%22%20r%3D%223.5%22%20fill%3D%22%232b2d42%22%2F%3E%3Ccircle%20cx%3D%2226.2%22%20cy%3D%2232.8%22%20r%3D%221.2%22%20fill%3D%22%23fff%22%2F%3E%3Ccircle%20cx%3D%2240.2%22%20cy%3D%2232.8%22%20r%3D%221.2%22%20fill%3D%22%23fff%22%2F%3E%3Cpath%20d%3D%22M28%2039q4%203.5%208%200%22%20fill%3D%22none%22%20stroke%3D%22%232b2d42%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%2F%3E%3Cellipse%20cx%3D%2220%22%20cy%3D%2239%22%20rx%3D%223.5%22%20ry%3D%222%22%20fill%3D%22%23ff5d8f%22%2F%3E%3Cellipse%20cx%3D%2244%22%20cy%3D%2239%22%20rx%3D%223.5%22%20ry%3D%222%22%20fill%3D%22%23ff5d8f%22%2F%3E%3C%2Fsvg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -14,9 +18,58 @@
 <!-- 시작 화면 -->
 <section id="home" class="screen">
   <div class="home-inner">
-    <h1 class="logo" aria-label="쭈큐브">
-      <span class="tile c-r"><span>쭈</span></span><span class="tile c-b"><span>큐</span></span><span class="tile c-y"><span>브</span></span>
+    <svg class="scene" viewBox="0 0 360 210" role="img" aria-label="강릉 바다 해돋이">
+      <defs>
+        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9fe0ff"/><stop offset="1" stop-color="#fff1c9"/></linearGradient>
+      </defs>
+      <rect width="360" height="210" rx="22" fill="url(#sky)"/>
+      <!-- 구름 -->
+      <path d="M40 46a12 12 0 0 1 22-6a10 10 0 0 1 16 8h-38z" fill="#fff" stroke="#2b2d42" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="M262 34a10 10 0 0 1 18-5a9 9 0 0 1 14 7h-32z" fill="#fff" stroke="#2b2d42" stroke-width="2.5" stroke-linejoin="round"/>
+      <!-- 정동진 해 (웃는 얼굴) -->
+      <g class="sun">
+        <g stroke="#ff9f1c" stroke-width="4" stroke-linecap="round">
+          <path d="M180 58v-14M138 72l-9-9M222 72l9-9M122 108h-13M238 108h13"/>
+        </g>
+        <circle cx="180" cy="118" r="46" fill="#ffc93c" stroke="#2b2d42" stroke-width="3"/>
+        <circle cx="165" cy="108" r="4" fill="#2b2d42"/><circle cx="195" cy="108" r="4" fill="#2b2d42"/>
+        <path d="M168 121q12 10 24 0" fill="none" stroke="#2b2d42" stroke-width="3" stroke-linecap="round"/>
+        <ellipse cx="156" cy="120" rx="6" ry="3.5" fill="#ff8fa3"/><ellipse cx="204" cy="120" rx="6" ry="3.5" fill="#ff8fa3"/>
+      </g>
+      <!-- 경포 바다 -->
+      <path d="M0 132q15-9 30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0V210H0z" fill="#3fa9f5" stroke="#2b2d42" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M24 152q10-6 20 0M96 160q10-6 20 0M210 150q10-6 20 0M282 162q10-6 20 0" fill="none" stroke="#bfe8ff" stroke-width="3" stroke-linecap="round"/>
+      <!-- 모래사장 -->
+      <path d="M0 182q60-14 120-4t120-2t120 4V210H0z" fill="#f7dfa5" stroke="#2b2d42" stroke-width="3" stroke-linejoin="round"/>
+      <!-- 소나무 -->
+      <g stroke="#2b2d42" stroke-width="2.5" stroke-linejoin="round">
+        <path d="M40 190q2-30-4-58l8-1q4 30 2 59z" fill="#a0673a"/>
+        <path d="M14 140q24-14 50-2q-8 10-26 9q-16 0-24-7z" fill="#3f9b5b"/>
+        <path d="M20 118q20-12 40-1q-6 9-21 8q-13 0-19-7z" fill="#4fb36b"/>
+        <path d="M27 98q14-10 28 0q-5 7-15 6q-9 0-13-6z" fill="#5fc47a"/>
+      </g>
+      <!-- 경포대 정자 -->
+      <g stroke="#2b2d42" stroke-width="2.5" stroke-linejoin="round">
+        <path d="M270 184q30-34 74-6v10h-74z" fill="#7ccf7f"/>
+        <path d="M284 150h56l8 8h-72z" fill="#c0392b"/>
+        <path d="M280 146q32-16 64 0q-6 6-32 6t-32-6z" fill="#3d4a6b"/>
+        <path d="M290 158v18M312 158v18M334 158v18" stroke-width="3"/>
+        <path d="M284 176h56v5h-56z" fill="#e9d8b4"/>
+      </g>
+      <!-- 갈매기 -->
+      <path class="gull" d="M92 70q8-8 14 0q6-8 14 0" fill="none" stroke="#2b2d42" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <path class="gull" d="M232 82q5-5 9 0q4-5 9 0" fill="none" stroke="#2b2d42" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- 안목 커피 -->
+      <g stroke="#2b2d42" stroke-width="2.5" stroke-linejoin="round" transform="translate(78 -6)">
+        <path d="M150 186h22l-3 16h-16z" fill="#fff"/>
+        <path d="M172 190q7 0 6 5t-7 4" fill="none"/>
+        <path d="M156 180q-3-4 0-8M164 180q-3-4 0-8" fill="none" stroke-width="2" stroke-linecap="round"/>
+      </g>
+    </svg>
+    <h1 class="logo" aria-label="강릉큐브">
+      <span class="tile c-r"><span>강</span></span><span class="tile c-b"><span>릉</span></span><span class="tile c-y"><span>큐</span></span><span class="tile c-k"><span>브</span></span>
     </h1>
+    <p class="tagline">경포 바다에서 한 판! 🌊</p>
 
     <div id="homeMain" class="stack">
       <label class="field">
@@ -27,13 +80,13 @@
       <button id="resumeCpuBtn" class="btn primary wide" hidden>컴퓨터전 이어하기</button>
       <div class="modes">
         <button class="mode-card" id="createCard">
-          <b>방 만들기</b><small>방 번호를 만들어 상대에게 알려줘요 (2~4명)</small>
+          <span class="ic">🏖️</span><b>방 만들기</b><small>방 번호를 만들어 상대에게 알려줘요 (2~4명)</small>
         </button>
         <button class="mode-card" id="joinCard">
-          <b>방 들어가기</b><small>받은 방 번호 4자리를 넣어요</small>
+          <span class="ic">🚪</span><b>방 들어가기</b><small>받은 방 번호 4자리를 넣어요</small>
         </button>
         <button class="mode-card" id="cpuCard">
-          <b>컴퓨터와 1:1</b><small>혼자 연습해요 (초보·중수·고수)</small>
+          <span class="ic">🦑</span><b>컴퓨터와 1:1</b><small>혼자 연습해요 (초보·중수·고수)</small>
         </button>
       </div>
     </div>
@@ -108,7 +161,7 @@
 
   <div class="table-wrap">
     <main id="table" class="table"></main>
-    <button id="tidyBtn" class="tidy-btn" hidden>정돈</button>
+    <button id="tidyBtn" class="tidy-btn" hidden>🧹 정돈</button>
   </div>
 
   <footer class="dock">
@@ -126,6 +179,7 @@
 <!-- 메뉴 -->
 <div id="menu" class="overlay" hidden>
   <div class="sheet">
+    <svg class="mascot" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 4c11 10 17 19 17 31v6a5 5 0 0 1-5 5H20a5 5 0 0 1-5-5v-6C15 23 21 14 32 4z" fill="#ff8fa3" stroke="#2b2d42" stroke-width="3" stroke-linejoin="round"/><path d="M17 22 8 27l8 4M47 22l9 5-8 4" fill="#ff8fa3" stroke="#2b2d42" stroke-width="3" stroke-linejoin="round"/><path d="M22 46v10M28 46v13M36 46v13M42 46v10" stroke="#2b2d42" stroke-width="3.5" stroke-linecap="round"/><circle cx="25" cy="34" r="3.5" fill="#2b2d42"/><circle cx="39" cy="34" r="3.5" fill="#2b2d42"/><circle cx="26.2" cy="32.8" r="1.2" fill="#fff"/><circle cx="40.2" cy="32.8" r="1.2" fill="#fff"/><path d="M28 39q4 3.5 8 0" fill="none" stroke="#2b2d42" stroke-width="2.5" stroke-linecap="round"/><ellipse cx="20" cy="39" rx="3.5" ry="2" fill="#ff5d8f"/><ellipse cx="44" cy="39" rx="3.5" ry="2" fill="#ff5d8f"/></svg>
     <h2>메뉴</h2>
     <p id="menuRoom" class="muted"></p>
     <button id="menuClose" class="btn primary wide">계속하기</button>
@@ -137,6 +191,7 @@
 <!-- 게임 끝 -->
 <div id="end" class="overlay" hidden>
   <div class="sheet">
+    <svg class="mascot" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 4c11 10 17 19 17 31v6a5 5 0 0 1-5 5H20a5 5 0 0 1-5-5v-6C15 23 21 14 32 4z" fill="#ff8fa3" stroke="#2b2d42" stroke-width="3" stroke-linejoin="round"/><path d="M17 22 8 27l8 4M47 22l9 5-8 4" fill="#ff8fa3" stroke="#2b2d42" stroke-width="3" stroke-linejoin="round"/><path d="M22 46v10M28 46v13M36 46v13M42 46v10" stroke="#2b2d42" stroke-width="3.5" stroke-linecap="round"/><circle cx="25" cy="34" r="3.5" fill="#2b2d42"/><circle cx="39" cy="34" r="3.5" fill="#2b2d42"/><circle cx="26.2" cy="32.8" r="1.2" fill="#fff"/><circle cx="40.2" cy="32.8" r="1.2" fill="#fff"/><path d="M28 39q4 3.5 8 0" fill="none" stroke="#2b2d42" stroke-width="2.5" stroke-linecap="round"/><ellipse cx="20" cy="39" rx="3.5" ry="2" fill="#ff5d8f"/><ellipse cx="44" cy="39" rx="3.5" ry="2" fill="#ff5d8f"/></svg>
     <h2 id="endTitle"></h2>
     <table class="scores">
       <thead><tr><th>이름</th><th>남은 타일</th><th>이번 판</th><th>누적</th></tr></thead>
