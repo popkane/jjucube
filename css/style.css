@@ -270,6 +270,13 @@ body.framed #stage { border-radius: 26px; box-shadow: 0 0 0 5px var(--ink), 0 14
 .pool small { font-size: 10px; color: var(--muted); }
 .main-btn { margin-top: auto; min-height: 76px; font-size: 17px; padding: 6px 2px; line-height: 1.2; word-break: keep-all; }
 
+/* 새로 받은 타일: 날아오는 동안 자리 비워 두고, 내려앉으면 잠깐 빛나며 NEW 표시 */
+.tile.flying { position: absolute; left: 0; top: 0; z-index: 55; pointer-events: none; box-shadow: 0 10px 0 rgba(43, 45, 66, 0.35); }
+.tile.incoming { visibility: hidden; }
+.tile.drawn { background: #fff6c7; box-shadow: 0 0 0 3px var(--sun), 0 0 14px 4px rgba(255, 201, 60, 0.9), 0 3px 0 var(--ink); animation: landed 0.35s ease-out; }
+.tile.drawn::before { content: "NEW"; position: absolute; top: -9px; left: 50%; transform: translateX(-50%); font-size: 10px; line-height: 1; padding: 2px 5px; border-radius: 999px; background: var(--coral); color: #fff; border: 1.5px solid var(--ink); }
+@keyframes landed { 0% { transform: translateY(-6px) scale(1.08); } 100% { transform: none; } }
+
 /* ---------- 끌기 ---------- */
 .drag-ghost { position: absolute; left: 0; top: 0; z-index: 50; display: flex; gap: 3px; pointer-events: none; }
 .drag-ghost .tile { --w: var(--gw, 38px); transform: rotate(-4deg); box-shadow: 0 10px 0 rgba(43, 45, 66, 0.35); }

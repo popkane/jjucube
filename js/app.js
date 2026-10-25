@@ -705,14 +705,59 @@ function renderRack() {
     }
   }
   for (const [key, [r, c]] of Object.entries(rackPos)) {
-    const t = tileEl(Number(key));
+    const id = Number(key);
+    const t = tileEl(id);
     t.style.left = `${x(c)}px`;
     t.style.top = `${y(r)}px`;
+    if (drawn.has(id)) t.classList.add('drawn');
+    if (flying.has(id)) t.classList.add('incoming');
     grid.append(t);
   }
   box.append(grid);
   box.classList.toggle('waiting', !isMyTurn());
   rackGeo = { el: grid, w, h, gap, cols };
+  flyNewTiles(Object.keys(rackPos).map(Number));
+}
+
+// ---------- 새로 받은 타일: 남은 타일 더미에서 날아와 받침대 자리에 내려앉고, 잠깐 빛남 ----------
+const drawn = new Set();   // 빛나는 중인 새 타일
+const flying = new Set();  // 날아오는 중(받침대 자리에서는 숨김)
+let knownRack = new Set();
+let knownFor = null;
+function flyNewTiles(ids) {
+  if (knownFor !== rackFor) { knownFor = rackFor; knownRack = new Set(ids); return; } // 새 판·다시 들어옴: 날리지 않음
+  // 처음 보는 타일만 (이번 차례에 냈다가 되돌린 타일은 이미 본 타일이라 제외)
+  const fresh = ids.filter((id) => !knownRack.has(id));
+  ids.forEach((id) => knownRack.add(id));
+  fresh.forEach((id, i) => setTimeout(() => flyOne(id), i * 140));
+}
+function flyOne(id) {
+  const target = $(`#rack .tile[data-id="${id}"]`);
+  const pool = $('.pool');
+  if (!target || !pool || !rackGeo) return;
+  flying.add(id);
+  target.classList.add('incoming');
+  const from = stagePos(pool);
+  const to = stagePos(target);
+  const fx = from.x + pool.offsetWidth / 2 - rackGeo.w / 2;
+  const fy = from.y + pool.offsetHeight / 2 - (rackGeo.w * RATIO) / 2;
+  const ghost = tileEl(id);
+  ghost.classList.add('flying');
+  ghost.style.setProperty('--tw', `${rackGeo.w}px`);
+  $('#stage').append(ghost);
+  const anim = ghost.animate([
+    { transform: `translate(${fx}px, ${fy}px) scale(0.5) rotate(-25deg)`, opacity: 0.6 },
+    { transform: `translate(${(fx + to.x) / 2}px, ${Math.min(fy, to.y) - 70}px) scale(1.25) rotate(-8deg)`, opacity: 1, offset: 0.55 },
+    { transform: `translate(${to.x}px, ${to.y}px) scale(1) rotate(0deg)`, opacity: 1 },
+  ], { duration: 650, easing: 'cubic-bezier(.3,.7,.4,1)' });
+  anim.onfinish = () => {
+    ghost.remove();
+    flying.delete(id);
+    drawn.add(id);
+    $(`#rack .tile[data-id="${id}"]`)?.classList.replace('incoming', 'drawn');
+    playTile('place', 1);
+    setTimeout(() => { drawn.delete(id); $(`#rack .tile[data-id="${id}"]`)?.classList.remove('drawn'); }, 4000);
+  };
 }
 
 function rackCell(px, py) {
