@@ -89,13 +89,15 @@ function without(layout, ids) {
 // 3) 나뉜 조합 사이·다른 조합과는 한 칸씩 띄운다. 밀 때는 오른쪽으로, 끝에 닿으면 왼쪽으로. 그래도 모자라면 판을 넓힌다.
 
 // 끄는 묶음(k장)을 놓을 가장 가까운 연속 빈칸. at = { colF, rowF }: 첫 타일 중심이 놓인 칸 좌표(실수)
-export function nearestFree(layout, board, ids, at) {
+// skip: 빼고 볼 줄 (거기 놓으면 줄이 넘쳐 다른 줄로 밀려나는 경우)
+export function nearestFree(layout, board, ids, at, skip = null) {
   const k = ids.length;
   const g = makeGrid(without(layout, ids), board);
   let best = null;
   // 판 양쪽 바깥 한 칸도 후보: 왼쪽 끝에 붙은 조합 앞에 놓으면 그 줄이 오른쪽으로 밀리며 들어간다 (오른쪽 끝도 마찬가지)
   const empty = (r, c) => c < 0 || c >= board.cols || g[r][c] === null;
   for (let r = 0; r < board.rows; r++) {
+    if (skip?.has(r)) continue;
     for (let s = -k; s <= board.cols; s++) {
       // 바깥은 '완전히 바깥이면서 끝 칸에 바로 붙는' 자리만, 그리고 끝 칸이 차 있을 때만
       if (s < 0 && (s !== -k || empty(r, 0))) continue;

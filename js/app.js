@@ -1156,11 +1156,20 @@ function findDrop(pt, ids, grab) {
     if (onTile) {
       // 끼워 넣기는 넣은 타일이 맞는 조합에 들어갈 때만 (작은 타일 위를 지나가다 엉뚱하게 끼워져 판이 흐트러지지 않게)
       const spot = { row, start: Math.max(0, Math.round(at.colF)), insert: true };
-      const sets = tableOf(dropTiles(work.layout, viewBoard(), ids, spot, lockedIds()).layout);
-      if (sets.some((set) => set.includes(ids[0]) && analyzeSet(set).valid)) return { type: 'board', spot, at };
+      const land = dropTiles(work.layout, viewBoard(), ids, spot, lockedIds()).layout;
+      if (tableOf(land).some((set) => set.includes(ids[0]) && analyzeSet(set).valid)) return { type: 'board', spot, at, land };
     }
-    const spot = nearestFree(work.layout, viewBoard(), ids, at);
-    return spot ? { type: 'board', spot, at } : null;
+    // 실제로 놓아 보고 떨어질 자리를 미리 보여 준다. 그 줄이 넘쳐 다른 줄로 밀려나면 그 줄은 빼고 다시 찾는다
+    // (파란 칸 = 손을 떼면 타일이 들어갈 바로 그 칸)
+    const skip = new Set();
+    for (let i = 0; i <= viewBoard().rows; i++) {
+      const spot = nearestFree(work.layout, viewBoard(), ids, at, skip);
+      if (!spot) return null;
+      const land = dropTiles(work.layout, viewBoard(), ids, spot, lockedIds()).layout;
+      if (land[ids[0]][0] === spot.row) return { type: 'board', spot, at, land };
+      skip.add(spot.row);
+    }
+    return null;
   }
   return null;
 }
@@ -1182,6 +1191,12 @@ function showTarget(dest, ids, pt) {
     bt.classList.toggle('edge', bar);
     const left = edgeL ? -3 : edgeR && !dest.spot.insert ? geo.cols * geo.w - 3 : dest.spot.start * geo.w - (bar ? 3 : 0);
     Object.assign(bt.style, { left: `${left}px`, top: `${dest.spot.row * geo.h}px`, width: bar ? '6px' : `${ids.length * geo.w}px`, height: `${geo.h}px` });
+    // 빈칸에 놓을 때는 정리(한 칸 띄우기 등)까지 끝난 실제 자리를 보여 준다
+    if (!bar && dest.land) {
+      const cells = ids.map((id) => dest.land[id]);
+      const c0 = Math.min(...cells.map(([, c]) => c));
+      Object.assign(bt.style, { left: `${c0 * geo.w}px`, top: `${cells[0][0] * geo.h}px` });
+    }
   } else if (dest?.type === 'rack' && dest.spot) {
     const cell = rackGeo.w + rackGeo.gap;
     rt.classList.toggle('insert', !!dest.insert); // 끼워 넣기: 그 자리 왼쪽에 막대
