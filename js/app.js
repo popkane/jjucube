@@ -4,7 +4,8 @@ import {
   newGame, validateTurn, submitTurn, drawTile, penalize, analyzeSet, sortRack, tileOf, rackValue,
   TURN_SECONDS_OPTIONS, MIN_PLAYERS,
 } from './engine.js';
-import { DEFAULT_BOARD, segments, tableOf, findPlacement, place, tidy, blockOrder, arrangeTable } from './board.js';
+import { DEFAULT_BOARD, segments, tableOf, findPlacement, place, placeFree, tidy, blockOrder, arrangeTable } from './board.js';
+import { syncRack, insertIntoRack, arrangeRack, rackGroups, rackCols, RACK_ROWS } from './rack.js';
 import { aiMove, LEVELS } from './ai.js';
 import { CHARACTERS, pickCharacters, avatarHtml } from './characters.js';
 import { playTile, playTurnBell, unlockAudio, setSoundEnabled } from './sound.js';
@@ -13,7 +14,7 @@ import {
 } from './net.js';
 
 const $ = (sel) => document.querySelector(sel);
-const KEY = { sort: 'rumikyub.sort', sound: 'rumikyub.sound', name: 'rumikyub.name', room: 'rumikyub.room', setup: 'rumikyub.setup', cpu: 'rumikyub.cpu' };
+const KEY = { rack: 'rumikyub.rack', sort: 'rumikyub.sort', sound: 'rumikyub.sound', name: 'rumikyub.name', room: 'rumikyub.room', setup: 'rumikyub.setup', cpu: 'rumikyub.cpu' };
 const CPU = 1; // 컴퓨터전에서 컴퓨터 자리 (나는 0)
 const RATIO = 1.36; // 타일 세로/가로
 const STALL_MS = 5000; // 차례인 사람이 시간 넘기고도 이만큼 반응이 없으면 다른 사람이 대신 벌칙 처리
@@ -54,6 +55,9 @@ let busy = false;           // 서버에 올리는 중
 let firedRev = -1;          // 시간 초과 처리를 이 버전에서 이미 했는지
 let sortBy = store.get(KEY.sort) === 'color' ? 'color' : 'number';
 let geo = null;             // 지금 그려진 바닥의 크기 { w, h, rows, cols, el, preview }
+let rackPos = {};           // 내 받침대 배치 { id: [줄, 칸] } — 내 폰에만 저장
+let rackFor = null;         // rackPos가 어느 판·자리 것인지
+let rackGeo = null;         // 지금 그려진 받침대 크기 { el, w, h, gap, cols }
 const setup = { players: 2, seconds: 60, level: 'easy', ...store.get(KEY.setup) };
 
 const me = () => room?.seat ?? -1;
@@ -62,6 +66,9 @@ const dirty = () => moves > 0;
 const playedCount = () => (work && turnStart ? turnStart.rack.length - work.rack.length : 0);
 const canAct = () => isMyTurn() && !busy && !!work && workTurn === game.turn && $('#menu').hidden;
 const lockedIds = () => (game.melded[me()] ? null : startTableIds);
+// 받침대 정리는 내 차례가 아니어도 할 수 있다
+const canArrange = () => !!game && game.status === 'playing' && me() >= 0 && $('#menu').hidden;
+const rackIds = () => (isMyTurn() && work ? work.rack : game.racks[me()]);
 const usedRows = (layout) => Object.values(layout).reduce((m, [r]) => Math.max(m, r + 1), 0);
 const isHost = () => mode === 'cpu' || roomData?.meta?.host === uid;
 
@@ -474,13 +481,20 @@ function moveTiles(ids, dest) {
   if (err) { toast(err); selected.clear(); render(); return; }
   selected.clear();
   if (dest.type === 'rack') {
-    ids = ids.filter((id) => !work.rack.includes(id));
-    if (ids.length === 0) { render(); return; }
-    moves += 1;
-    for (const id of ids) delete work.layout[id];
-    work.rack.push(...ids);
+    // 테이블에서 돌아오는 타일(이번 차례에 낸 것)은 내 차례에만
+    const back = ids.filter((id) => !rackIds().includes(id));
+    if (back.length) {
+      if (!canAct()) { render(); return; }
+      moves += 1;
+      for (const id of back) delete work.layout[id];
+      work.rack.push(...back);
+      sendLive();
+    }
+    ensureRack();
+    const at = dest.at || { row: 0, col: 999, grab: 0 };
+    rackPos = insertIntoRack(rackPos, ids, at.row, at.col - (at.grab || 0));
+    saveRack();
     playTile('rack', ids.length);
-    sendLive();
     render();
     return;
   }
@@ -596,19 +610,90 @@ function renderTable() {
   geo = { w, h, rows, cols: board.cols, el, preview };
 }
 
+// 받침대 배치를 지금 판·내 자리 것으로 맞춘다 (판이 바뀌면 새로, 받은/낸 타일 반영)
+function ensureRack() {
+  const key = `${game.gid || 'g'}:${me()}`;
+  if (rackFor !== key) {
+    const saved = store.get(KEY.rack);
+    rackPos = saved && saved.key === key ? saved.pos : {};
+    rackFor = key;
+  }
+  rackPos = syncRack(rackPos, rackIds());
+}
+const saveRack = () => store.set(KEY.rack, { key: rackFor, pos: rackPos });
+
+// 받침대: 2줄 판. 칸이 많아지면 타일이 작아진다. 같은 줄에 붙어 있는 맞는 조합에는 '내기' 버튼
 function renderRack() {
   const box = $('#rack');
   box.innerHTML = '';
   if (me() < 0 || !game) return;
-  const rack = isMyTurn() && work ? work.rack : game.racks[me()];
-  for (const id of sortRack(rack, sortBy)) box.append(tileEl(id));
+  ensureRack();
+  saveRack();
+  const cols = rackCols(rackPos);
+  const gap = 4;
+  const W = box.clientWidth - 24;
+  const w = Math.max(16, Math.min(46, (W - gap * (cols - 1)) / cols));
+  const h = w * RATIO;
+  const grid = document.createElement('div');
+  grid.className = 'rack-grid';
+  grid.style.width = `${cols * w + (cols - 1) * gap}px`;
+  grid.style.height = `${RACK_ROWS * h + (RACK_ROWS - 1) * gap}px`;
+  grid.style.setProperty('--tw', `${w}px`);
+  const x = (c) => c * (w + gap);
+  const y = (r) => r * (h + gap);
+  const mine = canAct();
+  for (const g of rackGroups(rackPos)) {
+    if (!g.valid) continue;
+    const s = document.createElement('div');
+    s.className = 'rack-set';
+    Object.assign(s.style, { left: `${x(g.start) - 3}px`, top: `${y(g.row) - 3}px`, width: `${g.ids.length * (w + gap) - gap + 6}px`, height: `${h + 6}px` });
+    grid.append(s);
+    if (mine) {
+      const b = document.createElement('button');
+      b.className = 'rack-play';
+      b.textContent = '내기 ▲';
+      b.dataset.ids = g.ids.join(',');
+      Object.assign(b.style, { left: `${x(g.start) + (g.ids.length * (w + gap) - gap) / 2}px`, top: `${y(g.row)}px` });
+      grid.append(b);
+    }
+  }
+  for (const [key, [r, c]] of Object.entries(rackPos)) {
+    const t = tileEl(Number(key));
+    t.style.left = `${x(c)}px`;
+    t.style.top = `${y(r)}px`;
+    grid.append(t);
+  }
+  box.append(grid);
   box.classList.toggle('waiting', !isMyTurn());
+  rackGeo = { el: grid, w, h, gap, cols };
+}
+
+function rackCell(px, py) {
+  const rect = rackGeo.el.getBoundingClientRect();
+  const col = Math.max(0, Math.floor((px - rect.left + rackGeo.gap / 2) / (rackGeo.w + rackGeo.gap)));
+  const row = Math.min(RACK_ROWS - 1, Math.max(0, Math.floor((py - rect.top + rackGeo.gap / 2) / (rackGeo.h + rackGeo.gap))));
+  return { row, col };
+}
+
+// 받침대에서 맞춰 둔 조합을 테이블 빈 곳에 한 번에
+function playFromRack(ids) {
+  if (!canAct()) return;
+  const res = placeFree(work.layout, viewBoard(), ids);
+  moves += 1;
+  work.layout = res.layout;
+  work.board = { cols: res.board.cols, rows: Math.max(work.board.rows, usedRows(res.layout), res.board.rows) };
+  const moved = new Set(ids);
+  work.rack = work.rack.filter((id) => !moved.has(id));
+  selected.clear();
+  playTile('snap', ids.length);
+  sendLive();
+  render();
 }
 
 function renderControls() {
   const status = $('#status');
   const main = $('#mainBtn');
-  $('#sortBtn').textContent = sortBy === 'number' ? '숫자순' : '색깔순';
+  $('#sortBtn').textContent = sortBy === 'number' ? '숫자순 정렬' : '색깔순 정렬';
   const mine = canAct();
   $('#undoBtn').disabled = !mine || !dirty();
   $('#tidyBtn').hidden = !mine || Object.keys(work.layout).length === 0;
@@ -683,6 +768,11 @@ async function commitLayout(layout, board) {
   } catch { /* 정돈은 못 올려도 게임은 계속 */ }
 }
 $('#sortBtn').addEventListener('click', () => {
+  // 누를 때 한 번만 정렬하고, 다음엔 다른 방식으로
+  if (!canArrange()) return;
+  rackPos = arrangeRack(rackIds(), sortBy);
+  saveRack();
+  playTile('rack', 3);
   sortBy = sortBy === 'number' ? 'color' : 'number';
   store.set(KEY.sort, sortBy);
   render();
@@ -765,7 +855,7 @@ function boardCell(x, y) {
 function dropAt(x, y, grab) {
   const el = document.elementFromPoint(x, y);
   if (!el) return null;
-  if (el.closest('#rack')) return { type: 'rack' };
+  if (el.closest('#rack')) return { type: 'rack', at: { ...rackCell(x, y), grab } };
   if (el.closest('#table')) return { type: 'board', at: { ...boardCell(x, y), grab } };
   return null;
 }
@@ -773,7 +863,7 @@ function dropAt(x, y, grab) {
 function showPreview(dest, ids) {
   const pv = geo.preview;
   $('#rack').classList.toggle('over', dest?.type === 'rack');
-  if (dest?.type !== 'board') { pv.hidden = true; return; }
+  if (dest?.type !== 'board' || !canAct()) { pv.hidden = true; return; }
   const p = findPlacement(work.layout, viewBoard(), ids, dest.at, lockedIds());
   if (!p) { pv.hidden = true; return; }
   pv.hidden = false;
@@ -788,7 +878,8 @@ function pointOf(e) {
 document.addEventListener('pointerdown', (e) => {
   unlockAudio();
   const tile = e.target.closest('#game .tile[data-id]');
-  if (!tile || !canAct()) return;
+  if (!tile) return;
+  if (!canAct() && !(canArrange() && tile.closest('#rack'))) return;
   press = { id: Number(tile.dataset.id), x: e.clientX, y: e.clientY, touch: e.pointerType !== 'mouse', dragging: false };
 });
 
@@ -830,8 +921,9 @@ function endPress(e, cancelled) {
   const pt = pointOf(e);
   press = null;
   p.ghost.remove();
-  // 끄는 도중에 시간이 다 돼서 차례가 넘어갔으면 놓지 않음
-  const dest = cancelled || !canAct() ? null : dropAt(pt.x, pt.y, p.grab);
+  // 내 차례가 아니면(끄는 도중 차례가 넘어간 경우 포함) 받침대 안에서 자리만 바꿀 수 있다
+  let dest = cancelled ? null : dropAt(pt.x, pt.y, p.grab);
+  if (dest && !canAct() && !(dest.type === 'rack' && canArrange() && p.ids.every((id) => rackIds().includes(id)))) dest = null;
   if (dest) moveTiles(p.ids, dest);
   else render();
 }
@@ -840,9 +932,11 @@ document.addEventListener('pointercancel', (e) => endPress(e, true));
 
 // 선택해 둔 타일을 바닥의 빈 곳이나 받침대를 눌러서 옮기기
 document.addEventListener('click', (e) => {
+  const play = e.target.closest('.rack-play');
+  if (play) { playFromRack(play.dataset.ids.split(',').map(Number)); return; }
   if (!canAct() || !selected.size || e.target.closest('.tile[data-id]')) return;
   const ids = blockOrder([...selected]);
-  if (e.target.closest('#rack')) moveTiles(ids, { type: 'rack' });
+  if (e.target.closest('#rack')) moveTiles(ids, { type: 'rack', at: { ...rackCell(e.clientX, e.clientY), grab: 0 } });
   else if (e.target.closest('#table')) moveTiles(ids, { type: 'board', at: { ...boardCell(e.clientX, e.clientY), grab: 0 } });
 });
 

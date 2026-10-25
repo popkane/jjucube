@@ -224,21 +224,26 @@ button, input { font: inherit; color: inherit; }
 .status.ok { color: #eaffd0; }
 .status.err { color: #fff0b3; }
 
-/* 받침대 = 나무 데크 */
+/* 받침대 = 나무 데크 (2줄 판, 타일은 놓은 자리 그대로) */
 .rack {
-  --tw: 36px;
-  display: flex; flex-wrap: wrap; gap: 6px; padding: 9px; min-height: 72px; max-height: 40dvh; overflow-y: auto;
+  position: relative; padding: 9px;
   background: repeating-linear-gradient(90deg, var(--wood) 0 46px, var(--wood-dark) 46px 49px);
   border: 3px solid var(--ink); border-radius: 16px; box-shadow: 0 4px 0 var(--ink);
 }
+.rack-grid { position: relative; margin: 0 auto; }
+.rack-grid .tile { position: absolute; }
+.rack-set { position: absolute; border-radius: 10px; background: rgba(47, 191, 113, 0.35); box-shadow: 0 0 0 3px var(--good); }
+.rack-play {
+  position: absolute; z-index: 2; transform: translate(-50%, -70%); white-space: nowrap; cursor: pointer;
+  font-size: 12px; line-height: 1; padding: 4px 9px; border: 2px solid var(--ink); border-radius: 999px;
+  background: var(--good); color: #fff; box-shadow: 0 2px 0 var(--ink);
+}
+.rack-play:active { transform: translate(-50%, -60%); box-shadow: 0 1px 0 var(--ink); }
 .rack.over { box-shadow: 0 0 0 4px var(--sun), 0 4px 0 var(--ink); }
 .rack.waiting { filter: saturate(0.8) brightness(0.95); }
 .controls { display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 8px; }
 .controls .btn { padding: 11px 4px; font-size: 16px; }
 
-@media (min-width: 600px) {
-  .rack { --tw: 44px; }
-}
 
 /* ---------- 끌기 ---------- */
 .drag-ghost { position: fixed; left: 0; top: 0; z-index: 50; display: flex; gap: 3px; pointer-events: none; }

@@ -233,3 +233,24 @@ export function arrangeTable(layout, board, table) {
   }
   return { layout: out, board: bd };
 }
+
+// 조합 하나를 테이블 빈 곳에 놓는다 (받침대에서 한 번에 내기). 자리가 없으면 정돈 → 그래도 없으면 줄을 늘린다.
+export function placeFree(layout, board, ids) {
+  const order = setOrder(ids) || ids;
+  let lay = { ...layout };
+  for (const id of ids) delete lay[id];
+  let bd = { ...board, cols: Math.max(board.cols, order.length) };
+  let spot = freeSpot(lay, bd, order.length);
+  let tidied = false;
+  if (!spot) {
+    ({ layout: lay, board: bd } = tidy(lay, bd));
+    tidied = true;
+    spot = freeSpot(lay, bd, order.length);
+  }
+  while (!spot) {
+    bd = { ...bd, rows: bd.rows + 1 };
+    spot = freeSpot(lay, bd, order.length);
+  }
+  order.forEach((id, i) => { lay[id] = [spot.row, spot.start + i]; });
+  return { layout: lay, board: bd, tidied };
+}
