@@ -89,10 +89,15 @@ export function nearestFree(layout, board, ids, at) {
   const k = ids.length;
   const g = makeGrid(without(layout, ids), board);
   let best = null;
+  // 판 양쪽 바깥 한 칸도 후보: 왼쪽 끝에 붙은 조합 앞에 놓으면 그 줄이 오른쪽으로 밀리며 들어간다 (오른쪽 끝도 마찬가지)
+  const empty = (r, c) => c < 0 || c >= board.cols || g[r][c] === null;
   for (let r = 0; r < board.rows; r++) {
-    for (let s = 0; s + k <= board.cols; s++) {
+    for (let s = -k; s <= board.cols; s++) {
+      // 바깥은 '완전히 바깥이면서 끝 칸에 바로 붙는' 자리만, 그리고 끝 칸이 차 있을 때만
+      if (s < 0 && (s !== -k || empty(r, 0))) continue;
+      if (s + k > board.cols && (s !== board.cols || empty(r, board.cols - 1))) continue;
       let ok = true;
-      for (let c = s; c < s + k; c++) if (g[r][c] !== null) { ok = false; break; }
+      for (let c = s; c < s + k; c++) if (!empty(r, c)) { ok = false; break; }
       if (!ok) continue;
       const d = Math.hypot(s + 0.5 - at.colF, (r + 0.5 - at.rowF) * 1.25);
       if (!best || d < best.d) best = { row: r, start: s, d };

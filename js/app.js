@@ -1024,7 +1024,12 @@ function showTarget(dest, ids, pt) {
     const o = stagePos(geo.el);
     geo.el.style.setProperty('--mx', `${pt.sx - o.x}px`);
     geo.el.style.setProperty('--my', `${pt.sy - o.y}px`);
-    Object.assign(bt.style, { left: `${dest.spot.start * geo.w}px`, top: `${dest.spot.row * geo.h}px`, width: `${ids.length * geo.w}px`, height: `${geo.h}px` });
+    // 판 끝 바깥에 넣으면(줄이 밀리며 들어감) 그 끝에 빛나는 막대로 보여준다
+    const edgeL = dest.spot.start < 0;
+    const edgeR = dest.spot.start + ids.length > geo.cols;
+    bt.classList.toggle('edge', edgeL || edgeR);
+    const left = edgeL ? -3 : edgeR ? geo.cols * geo.w - 3 : dest.spot.start * geo.w;
+    Object.assign(bt.style, { left: `${left}px`, top: `${dest.spot.row * geo.h}px`, width: edgeL || edgeR ? '6px' : `${ids.length * geo.w}px`, height: `${geo.h}px` });
   } else if (dest?.type === 'rack' && dest.spot) {
     const cell = rackGeo.w + rackGeo.gap;
     rt.classList.toggle('insert', !!dest.insert); // 끼워 넣기: 그 자리 왼쪽에 막대
