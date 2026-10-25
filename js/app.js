@@ -848,7 +848,8 @@ let press = null;
 function boardCell(x, y) {
   const rect = geo.el.getBoundingClientRect();
   const clamp = (v, max) => Math.min(max - 1, Math.max(0, v));
-  return { col: clamp(Math.floor((x - rect.left) / geo.w), geo.cols), row: clamp(Math.floor((y - rect.top) / geo.h), geo.rows) };
+  const colF = (x - rect.left) / geo.w; // 칸 안에서 왼쪽/오른쪽 어디쯤인지까지
+  return { col: clamp(Math.floor(colF), geo.cols), colF, row: clamp(Math.floor((y - rect.top) / geo.h), geo.rows) };
 }
 
 // 놓을 곳: 받침대 / 바닥(칸) / 그 밖이면 null

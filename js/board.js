@@ -45,13 +45,32 @@ export function couldBeSet(ids) {
 }
 
 // 조합(또는 조합이 될 모양)이면 보기 좋은 순서로, 아니면 null (놓인 순서 그대로 둠)
+// ids는 바닥에 놓인 순서(왼→오). 런에서 남는 조커는 놓인 쪽을 따른다: 숫자 앞에 놓았으면 앞(작은 수), 뒤면 뒤.
 export function setOrder(ids) {
   const a = analyzeSet(ids);
+  if (a.valid && a.type === 'run') return runOrder(ids, a);
   if (a.valid) return a.order;
   if (!couldBeSet(ids)) return null;
   const reals = ids.map(tileOf).filter((t) => !t.joker);
   const run = reals.length === 2 && reals[0].color === reals[1].color;
   return sortRack(ids, run ? 'color' : 'number');
+}
+
+function runOrder(ids, a) {
+  const tiles = ids.map(tileOf);
+  const reals = tiles.filter((t) => !t.joker);
+  const jokers = tiles.filter((t) => t.joker);
+  const min = Math.min(...reals.map((t) => t.num));
+  const max = Math.max(...reals.map((t) => t.num));
+  const extra = ids.length - (max - min + 1); // 빈 숫자를 채우고도 남는 조커
+  if (extra <= 0 || jokers.length === 0) return a.order;
+  const leading = tiles.findIndex((t) => !t.joker); // 첫 숫자 앞에 놓인 조커 수
+  let low = Math.min(extra, leading, min - 1);
+  if (max + (extra - low) > 13) low = extra - (13 - max); // 13을 넘으면 앞으로
+  const lo = min - low;
+  const byNum = new Map(reals.map((t) => [t.num, t.id]));
+  const free = jokers.map((t) => t.id);
+  return Array.from({ length: ids.length }, (_, i) => byNum.get(lo + i) ?? free.shift());
 }
 
 export const blockOrder = (ids) => setOrder(ids) || ids;
@@ -71,6 +90,17 @@ export function findPlacement(layout, board, ids, at, locked = null) {
   if (k > board.cols) return null;
   const g = makeGrid(without(layout, ids), board);
   const want = at.col - (at.grab || 0);
+  // 같은 줄에서 손가락(떠 있는 타일)에 가장 가까운 조합: 빈칸 하나를 두고 양쪽에 조합이 있을 때 어느 쪽에 붙일지 정한다
+  const colF = at.colF ?? at.col + 0.5;
+  let near = null;
+  let nearD = Infinity;
+  for (const s of segments(without(layout, ids))) {
+    if (s.row !== at.row) continue;
+    const d = colF < s.start ? s.start - colF : colF > s.start + s.ids.length ? colF - s.start - s.ids.length : 0;
+    if (d < nearD) { nearD = d; near = s.ids[0]; }
+  }
+  const NEAR_BONUS = 0.75;
+  const nearBonus = (merged) => (near !== null && nearD < 1.5 && merged.includes(near) ? NEAR_BONUS : 0);
   let best = null;
   for (let r = 0; r < board.rows; r++) {
     const row = g[r];
@@ -90,7 +120,7 @@ export function findPlacement(layout, board, ids, at, locked = null) {
         if (!couldBeSet(merged)) continue;
         const a = s - left.length, b = s + k - 1 + right.length;
         const dc = at.col < a ? a - at.col : at.col > b ? at.col - b : 0;
-        cand = { row: r, start: a, order: setOrder(merged), merge: true, score: dr + dc - SNAP };
+        cand = { row: r, start: a, order: setOrder(merged), merge: true, score: dr + dc - SNAP - nearBonus(merged) };
       } else {
         cand = { row: r, start: s, order: block, merge: false, score: dr + Math.abs(s - want) };
       }
@@ -102,7 +132,8 @@ export function findPlacement(layout, board, ids, at, locked = null) {
   // 조합되는 묶음이면 그 조합을 통째로 옆으로 밀거나 빈 곳으로 옮겨서 붙인다
   for (const seg of segments(without(layout, ids))) {
     if (locked && seg.ids.some((id) => locked.has(id))) continue;
-    const merged = [...seg.ids, ...block];
+    // 조합 왼쪽(첫 타일 포함)에 놓았으면 앞에, 아니면 뒤에 붙인 것으로 본다
+    const merged = at.row === seg.row && at.col <= seg.start ? [...block, ...seg.ids] : [...seg.ids, ...block];
     if (!couldBeSet(merged)) continue;
     const spot = relocateSpot(g, board, seg, merged.length);
     if (!spot) continue;
@@ -110,7 +141,7 @@ export function findPlacement(layout, board, ids, at, locked = null) {
     const dr = Math.abs(seg.row - at.row) * ROW_WEIGHT;
     const dc = at.col < seg.start ? seg.start - at.col : at.col > end ? at.col - end : 0;
     // 제자리에서 붙일 수 있으면 그쪽이 먼저 (옮기는 건 조금 손해로 침)
-    const cand = { row: spot.row, start: spot.start, order: setOrder(merged), merge: true, score: dr + dc - SNAP + 0.5 };
+    const cand = { row: spot.row, start: spot.start, order: setOrder(merged), merge: true, score: dr + dc - SNAP + 0.5 - nearBonus(merged) };
     if (!best || cand.score < best.score) best = cand;
   }
   return best;
@@ -204,7 +235,8 @@ function freeSpot(layout, board, k) {
 // 조합 목록(컴퓨터가 낸 결과)을 바닥에 놓는다: 그대로인 조합은 제자리, 바뀌었거나 새로 생긴 조합은 빈 곳에.
 // 빈 곳이 없으면 정돈해 보고, 그래도 없으면 줄을 늘린다.
 export function arrangeTable(layout, board, table) {
-  const key = (ids) => ids.join(',');
+  // 같은 타일들로 된 조합이면(순서가 달라도) 제자리에 그대로 둔다
+  const key = (ids) => [...ids].sort((x, y) => x - y).join(',');
   const keep = new Map(segments(layout).map((s) => [key(s.ids), s]));
   let out = {};
   const pending = [];
@@ -212,7 +244,7 @@ export function arrangeTable(layout, board, table) {
     const ids = setOrder(set) || set;
     const s = keep.get(key(ids));
     if (s) {
-      ids.forEach((id, i) => { out[id] = [s.row, s.start + i]; });
+      s.ids.forEach((id, i) => { out[id] = [s.row, s.start + i]; });
       keep.delete(key(ids));
     } else pending.push(ids);
   }
