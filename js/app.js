@@ -9,7 +9,7 @@ import { DEFAULT_BOARD, segments, tableOf, nearestFree, dropTiles, blockOrder, a
 import { syncRack, arrangeRack, rackCols, nearestFreeSlot, placeInRack, insertIntoRack, RACK_ROWS } from './rack.js';
 import { aiMove, LEVELS } from './ai.js';
 import { CHARACTERS, pickCharacters, avatarHtml } from './characters.js';
-import { playTile, playCollect, playTurnBell, playJoin, playStart, playWin, playClockTick, unlockAudio, setSoundEnabled } from './sound.js';
+import { playTile, playCollect, playShimmer, playTurnBell, playJoin, playStart, playWin, playClockTick, unlockAudio, setSoundEnabled } from './sound.js';
 import {
   signIn, serverNow, seatList, createRoom, joinRoom, leaveLobby, armLobbyCleanup, canResume, markOnline, watchRoom, startRoom, commitSync, setLive,
 } from './net.js';
@@ -1009,7 +1009,8 @@ function flyOne(id, quick = false) {
       el?.classList.add('drawn');
       setTimeout(() => { drawn.delete(id); rackTiles.get(id)?.classList.remove('drawn'); }, 2500);
     }
-    playTile(quick ? 'rack' : 'place', 1);
+    if (tileOf(id).joker) playShimmer(); // 조커가 들어오면 '샤라랑~'
+    else playTile(quick ? 'rack' : 'place', 1);
   };
   anim.onfinish = finish;
   setTimeout(finish, (quick ? 420 : 620) + 400);

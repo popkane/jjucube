@@ -181,3 +181,17 @@ export function playWin(mine) {
     note(t + 0.5, 392, 0.8, 0.08, 'sine');
   }
 }
+
+// 조커가 내 손에 들어올 때 '샤라랑~' — 빠르게 올라가는 반짝이는 음 + 잔향
+export function playShimmer() {
+  if (!ready()) return;
+  const t = ctx.currentTime + 0.02;
+  const scale = [1046.5, 1174.66, 1318.51, 1567.98, 1760, 2093, 2349.32, 2637.02]; // 높은 도~미 (펜타토닉 느낌)
+  scale.forEach((f, i) => {
+    note(t + i * 0.045, f, 0.5, 0.06, 'sine');
+    note(t + i * 0.045, f * 2, 0.25, 0.015, 'sine'); // 맑은 배음
+  });
+  note(t + 0.38, 2093, 1.0, 0.05, 'sine');  // 마지막에 길게 울림
+  note(t + 0.38, 1567.98, 1.0, 0.04, 'sine');
+  for (let i = 0; i < 6; i++) click(t + 0.05 + i * 0.07, 6000 + Math.random() * 2000, 0.05, 0.04); // 반짝반짝
+}
