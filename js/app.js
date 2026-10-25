@@ -754,7 +754,7 @@ function renderTable() {
     box.innerHTML = '';
     boardEl = document.createElement('div');
     boardEl.className = 'board';
-    boardEl.innerHTML = '<div class="grid-hint"></div><div class="target" hidden></div>';
+    boardEl.innerHTML = '<div class="grid-hint"></div><div class="target off"></div>';
     box.append(boardEl);
     boardTiles.clear();
   }
@@ -902,7 +902,7 @@ function renderRack() {
     box.innerHTML = '';
     rackGridEl = document.createElement('div');
     rackGridEl.className = 'rack-grid';
-    rackGridEl.innerHTML = '<div class="rack-back"></div><div class="rack-front"><span>강릉큐브</span></div><div class="target" hidden></div>';
+    rackGridEl.innerHTML = '<div class="rack-back"></div><div class="rack-front"><span>강릉큐브</span></div><div class="target off"></div>';
     box.append(rackGridEl);
     rackTiles.clear();
   }
@@ -1177,8 +1177,15 @@ function findDrop(pt, ids, grab) {
 function showTarget(dest, ids, pt) {
   const bt = geo?.el.querySelector('.target');
   const rt = rackGeo?.el.querySelector('.target');
-  if (bt) bt.hidden = dest?.type !== 'board';
-  if (rt) rt.hidden = !(dest?.type === 'rack' && dest.spot);
+  // 숨겼다 보였다 깜빡이지 않게 투명도로 부드럽게. 꺼져 있다 켜질 때는 그 자리에서 바로 나타남(구석에서 미끄러져 오지 않게)
+  const show = (el, on) => {
+    if (!el) return;
+    el.hidden = false;
+    if (on && el.classList.contains('off')) { el.style.transition = 'none'; requestAnimationFrame(() => { el.style.transition = ''; }); }
+    el.classList.toggle('off', !on);
+  };
+  show(bt, dest?.type === 'board');
+  show(rt, dest?.type === 'rack' && !!dest.spot);
   geo?.el.classList.toggle('dragging', dest?.type === 'board');
   if (dest?.type === 'board') {
     const o = stagePos(geo.el);
@@ -1207,7 +1214,7 @@ function showTarget(dest, ids, pt) {
 // 손가락 위치 → 끄는 타일 위치 (틀 안 좌표 sx, sy) + 그 지점의 화면 좌표 (x, y: 놓을 곳 찾기용)
 function pointOf(e) {
   const s = toStage(e.clientX, e.clientY);
-  const sy = s.y - (press?.touch ? Math.max(geo?.h || 40, 40) * 0.9 : 0);
+  const sy = s.y; // 끄는 타일은 손가락 바로 밑 (위로 띄우지 않음)
   const c = fromStage(s.x, sy);
   return { sx: s.x, sy, x: c.x, y: c.y, fx: e.clientX, fy: e.clientY, fsy: s.y };
 }
