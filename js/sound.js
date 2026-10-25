@@ -66,3 +66,26 @@ export function playTile(kind = 'place', count = 1) {
     }
   }
 }
+
+// 내 차례 알림 '띵동' — 초인종처럼 높은 음 → 낮은 음, 작게
+function bell(t, freq, gain) {
+  for (const [mult, g] of [[1, gain], [2, gain * 0.25]]) { // 기본음 + 맑은 배음
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.value = freq * mult;
+    const v = ctx.createGain();
+    v.gain.setValueAtTime(0.0001, t);
+    v.gain.exponentialRampToValueAtTime(g, t + 0.015);
+    v.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+    o.connect(v).connect(ctx.destination);
+    o.start(t);
+    o.stop(t + 0.95);
+  }
+}
+
+export function playTurnBell() {
+  if (!enabled || !ctx || ctx.state !== 'running') return;
+  const t = ctx.currentTime + 0.01;
+  bell(t, 659.25, 0.16);        // 띵 (미)
+  bell(t + 0.28, 523.25, 0.14); // 동 (도)
+}

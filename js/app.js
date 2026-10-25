@@ -7,7 +7,7 @@ import {
 import { DEFAULT_BOARD, segments, tableOf, findPlacement, place, tidy, blockOrder, arrangeTable } from './board.js';
 import { aiMove, LEVELS } from './ai.js';
 import { CHARACTERS, pickCharacters, avatarHtml } from './characters.js';
-import { playTile, unlockAudio, setSoundEnabled } from './sound.js';
+import { playTile, playTurnBell, unlockAudio, setSoundEnabled } from './sound.js';
 import {
   signIn, serverNow, seatList, createRoom, joinRoom, markOnline, watchRoom, startRoom, commitSync, setLive,
 } from './net.js';
@@ -347,6 +347,7 @@ function beginTurn() {
   selected.clear();
   live = null;
   toast('내 차례예요!');
+  playTurnBell();
   navigator.vibrate?.(60);
 }
 
