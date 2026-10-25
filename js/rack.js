@@ -95,3 +95,28 @@ export function rackGroups(pos) {
   for (const g of out) g.valid = analyzeSet(g.ids).valid;
   return out;
 }
+
+// 끄는 묶음(k장)을 놓을 받침대의 가장 가까운 연속 빈칸. at = { colF, rowF } (첫 타일 중심의 칸 좌표, 실수)
+export function nearestFreeSlot(pos, ids, at, cols) {
+  const moving = new Set(ids);
+  const used = new Set(Object.entries(pos).filter(([id]) => !moving.has(Number(id))).map(([, [r, c]]) => `${r}:${c}`));
+  let best = null;
+  for (let r = 0; r < RACK_ROWS; r++) {
+    for (let s = 0; s + ids.length <= cols; s++) {
+      let ok = true;
+      for (let c = s; c < s + ids.length; c++) if (used.has(`${r}:${c}`)) { ok = false; break; }
+      if (!ok) continue;
+      const d = Math.hypot(s + 0.5 - at.colF, (r + 0.5 - at.rowF) * 1.25);
+      if (!best || d < best.d) best = { row: r, start: s, d };
+    }
+  }
+  return best;
+}
+
+export function placeInRack(pos, ids, spot) {
+  const moving = new Set(ids);
+  const out = {};
+  for (const [id, p] of Object.entries(pos)) if (!moving.has(Number(id))) out[id] = p;
+  ids.forEach((id, i) => { out[id] = [spot.row, spot.start + i]; });
+  return out;
+}
