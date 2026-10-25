@@ -9,7 +9,7 @@ import { DEFAULT_BOARD, segments, tableOf, nearestFree, dropTiles, blockOrder, a
 import { syncRack, arrangeRack, rackCols, nearestFreeSlot, placeInRack, insertIntoRack, RACK_ROWS } from './rack.js';
 import { aiMove, LEVELS } from './ai.js';
 import { CHARACTERS, pickCharacters, avatarHtml } from './characters.js';
-import { playTile, playTurnBell, playClockTick, unlockAudio, setSoundEnabled } from './sound.js';
+import { playTile, playCollect, playTurnBell, playJoin, playStart, playWin, playClockTick, unlockAudio, setSoundEnabled } from './sound.js';
 import {
   signIn, serverNow, seatList, createRoom, joinRoom, leaveLobby, armLobbyCleanup, canResume, markOnline, watchRoom, startRoom, commitSync, setLive,
 } from './net.js';
@@ -54,6 +54,8 @@ let workTurn = null;        // work가 몇 번째 차례 것인지
 let turnStart = null;       // 차례 시작 때의 work (되돌리기 = 여기로 전부 되돌림)
 let moves = 0;              // 이번 차례에 옮긴 횟수
 let startTableIds = new Set();
+let lobbySeen = { code: null, n: 0 }; // 대기실 인원 (들어올 때 소리)
+let endSoundGid = null;     // 승리 소리를 낸 판
 let tickKey = null;         // 초시계 소리를 낸 초 (rev:초)
 let tableFor = null;        // 테이블을 그리던 판 (같은 판일 때만 날아가는 연출)
 const leftBoard = new Map(); // 방금 테이블에서 빠져 받침대로 돌아오는 타일 → 출발 위치
@@ -301,8 +303,6 @@ function scheduleCpu() {
       const r = submitTurn(game, CPU, m.table);
       if (r.ok) {
         const { layout, board } = arrangeTable(game.layout, game.board, m.table);
-        const n = r.state.last.count;
-        playTile(n > 1 ? 'snap' : 'place', n);
         commit({ ...r.state, layout, board });
         return;
       }
@@ -366,7 +366,7 @@ function onRoom(data) {
     liveRaw = raw;
     const l = raw ? JSON.parse(raw) : null;
     const fresh = l && game && l.turn === game.turn && l.player === game.current && !isMyTurn() ? l : null;
-    if (fresh && live && fresh.moves > live.moves) playTile(fresh.snap ? 'snap' : 'place', 1);
+    if (fresh && live && fresh.moves > live.moves) playTile('opp', 1); // 상대가 놓는 소리는 작고 조금 낮게
     live = fresh;
   }
   if (!press) render(); // 끄는 도중에는 다시 그리지 않음 (끝나면 그림)
@@ -420,6 +420,11 @@ function renderLobby(seats) {
   showScreen('#lobby');
   const meta = roomData.meta;
   $('#lobbyCode').innerHTML = [...room.code].map((d) => `<span>${d}</span>`).join('');
+  // 누가 들어올 때마다(나 포함) '뾰롱'
+  const filled = Object.values(seats).filter(Boolean).length;
+  if (lobbySeen.code !== room.code) lobbySeen = { code: room.code, n: 0 };
+  if (filled > lobbySeen.n) playJoin();
+  lobbySeen.n = filled;
   const list = $('#lobbySeats');
   list.innerHTML = '';
   for (let i = 0; i < meta.players; i++) {
@@ -472,6 +477,7 @@ function maybeIntro() {
   $('#introList').innerHTML = names.map((name, p) => `<li>${avatarHtml(chars[p])}<b></b><small>${CHARACTERS[chars[p]].name}</small></li>`).join('');
   [...$('#introList').children].forEach((li, p) => { li.querySelector('b').textContent = p === me() ? `${names[p]}(나)` : names[p]; });
   $('#intro').hidden = false;
+  playStart();
   clearTimeout(maybeIntro.t);
   maybeIntro.t = setTimeout(() => { $('#intro').hidden = true; }, 2200);
 }
@@ -789,8 +795,13 @@ function renderTable() {
     el.classList.remove('appear');
     el.classList.add('incoming');
     const delay = n++ * 70;
-    setTimeout(() => flyBetween(tileEl(id), start, tileRect(el, w - 2)).then(() => el.classList.remove('incoming')), delay);
+    const theirs = !rackTiles.has(id);
+    setTimeout(() => flyBetween(tileEl(id), start, tileRect(el, w - 2)).then(() => {
+      el.classList.remove('incoming');
+      playTile(theirs ? 'opp' : 'place', 1);
+    }), delay);
   }
+  let toThem = 0;
   for (const [id, el] of boardTiles) {
     if (keep.has(id)) continue;
     // 테이블에서 빠진 타일: 내 받침대로 돌아오면 받침대가 이어받아 날리고, 상대 손으로 돌아가면 그 캐릭터 쪽으로 날아감
@@ -799,12 +810,13 @@ function renderTable() {
       if (rackIds().includes(id)) leftBoard.set(id, rect);
       else {
         const owner = game.racks.findIndex((rk, p) => p !== me() && rk.includes(id));
-        if (owner >= 0) flyBetween(tileEl(id), rect, { ...avatarRect(owner, w * 0.45), fade: true });
+        if (owner >= 0) { flyBetween(tileEl(id), rect, { ...avatarRect(owner, w * 0.45), fade: true }); toThem += 1; }
       }
     }
     el.remove();
     boardTiles.delete(id);
   }
+  if (toThem) playCollect(toThem, true); // 상대 타일이 손으로 회수됨
   geo = { w, h, rows, cols, el: boardEl };
   syncTileClasses();
 }
@@ -909,6 +921,7 @@ function renderRack() {
   Object.assign(rackGridEl.querySelector('.rack-back').style, { top: `${h * 0.3}px`, height: `${y(1) + h * 0.5 - h * 0.3}px` });
   Object.assign(rackGridEl.querySelector('.rack-front').style, { top: `${y(1) + h * 0.3}px`, height: `${h * 0.7 + 8}px` });
   const keep = new Set();
+  let homing = 0;
   for (const [key, [r, c]] of Object.entries(rackPos)) {
     const id = Number(key);
     const back = !rackTiles.has(id) && !spawnAt.has(id) ? leftBoard.get(id) : null;
@@ -918,6 +931,7 @@ function renderRack() {
       // 테이블에서 돌아온 타일(되돌리기·시간 초과): 테이블 자리에서 받침대 칸으로 날아옴
       el.classList.remove('appear');
       el.dataset.homing = '1';
+      homing += 1;
       flyBetween(tileEl(id), back, tileRect(el, w)).then(() => { delete el.dataset.homing; el.classList.remove('incoming'); });
     }
     el.classList.toggle('incoming', flying.has(id) || el.dataset.homing === '1');
@@ -926,6 +940,7 @@ function renderRack() {
   }
   prune(rackTiles, keep);
   leftBoard.clear();
+  if (homing) playCollect(homing); // 내 타일이 받침대로 회수됨 (되돌리기·시간 초과)
   box.classList.toggle('waiting', !isMyTurn());
   rackGeo = { el: rackGridEl, w, h, gap: RACK_GAP, cols };
   syncTileClasses();
@@ -1023,8 +1038,7 @@ $('#undoBtn').addEventListener('click', () => {
   work = structuredClone(turnStart);
   moves = 0;
   selected.clear();
-  playTile('rack', 2);
-  sendLive();
+  sendLive(); // 소리는 타일이 받침대로 돌아올 때 '사라락'
   render();
 });
 // 789 = 같은 색 연속끼리, 777 = 같은 숫자끼리. 누를 때만 한 번 정렬 (조합 뒤에 한 칸씩 띄움)
@@ -1084,6 +1098,7 @@ function showEnd() {
   $('#againInfo').hidden = isHost();
   $('#homeBtn').textContent = mode === 'cpu' ? '그만하기' : '방 나가기';
   $('#end').hidden = false;
+  if (endSoundGid !== game.gid) { endSoundGid = game.gid; playWin(w === me()); }
 }
 $('#againBtn').addEventListener('click', () => {
   if (mode === 'cpu') {
