@@ -1,12 +1,12 @@
 /* 강릉큐브 — 강릉 바다 만화풍. 굵은 테두리 + 스티커 같은 그림자 */
 :root {
   --ink: #2b2d42;           /* 테두리·글씨 */
-  --sky: #9fe0ff;
-  --sky-2: #d9f4ff;
+  --sky: #bdeaff;
+  --sky-2: #eaf8ff;
   --sea: #3fa9f5;
   --sea-deep: #1f7fd0;
-  --sand: #f7e3b0;
-  --sand-dot: rgba(160, 110, 50, 0.12);
+  --sand: #fdf1d4;
+  --sand-dot: rgba(190, 140, 70, 0.10);
   --wood: #c98b4f;
   --wood-dark: #a86d38;
   --sun: #ffc93c;
@@ -75,7 +75,7 @@ button, input { font: inherit; color: inherit; }
 
 /* ---------- 시작 화면 ---------- */
 .screen { height: 100dvh; }
-#home, #lobby { overflow-y: auto; background: linear-gradient(var(--sky-2), #fff7e0); }
+#home, #lobby { overflow-y: auto; background: linear-gradient(#eaf8ff, #fffaf0 70%); }
 .home-inner { max-width: 420px; margin: 0 auto; padding: 20px 16px 32px; display: flex; flex-direction: column; gap: 16px; }
 .scene { width: 100%; height: auto; display: block; border: 3px solid var(--ink); border-radius: 24px; box-shadow: 0 5px 0 var(--ink); background: var(--sky); }
 .scene .sun { animation: rise 4s ease-in-out infinite alternate; }
@@ -152,20 +152,33 @@ button, input { font: inherit; color: inherit; }
 /* ---------- 게임 화면 ---------- */
 #game { display: flex; flex-direction: column; background: var(--sand); }
 .hud {
-  display: flex; align-items: center; gap: 8px; padding: 8px 12px; padding-top: max(8px, env(safe-area-inset-top));
+  display: flex; align-items: center; gap: 8px; padding: 6px 10px; padding-top: max(8px, env(safe-area-inset-top));
   background: var(--sky); border-bottom: 3px solid var(--ink);
 }
-.players { flex: 1; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px 2px 5px; }
-.player {
-  flex: none; display: flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px;
-  background: #fff; border: 2.5px solid var(--ink); box-shadow: 0 3px 0 var(--ink); font-size: 14px; white-space: nowrap;
+.players { flex: 1; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding: 9px 2px 2px; justify-content: center; }
+/* 플레이어 = 동물 캐릭터 카드 */
+.player { flex: none; position: relative; display: grid; justify-items: center; gap: 1px; width: 62px; padding-top: 2px; transition: transform 0.2s; }
+.player .avatar { width: 46px; height: 46px; }
+.player .nm { font-size: 13px; max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player.me .nm { color: var(--sea-deep); }
+.player .count {
+  position: absolute; top: -2px; right: 2px; min-width: 22px; height: 22px; padding: 0 5px; display: grid; place-items: center;
+  background: var(--cream); color: var(--ink); border: 2.5px solid var(--ink); border-radius: 999px; font-size: 13px; line-height: 1;
 }
-.player.active { background: var(--sun); }
-.player .count { background: var(--ink); color: #fff; border-radius: 999px; padding: 1px 7px; font-size: 13px; }
-.player .tag { font-size: 11px; color: var(--muted); }
-.player .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); border: 1.5px solid var(--ink); flex: none; }
-.player.offline { opacity: 0.55; }
-.player.offline .dot { background: #bbb; }
+.player .nm { order: 2; margin-top: 4px; }
+.player .tag { order: 3; white-space: nowrap; font-size: 10px; line-height: 1.3; padding: 0 5px; border-radius: 999px; background: #fff; border: 1.5px solid var(--ink); margin-top: 1px; }
+.player.active .avatar { box-shadow: 0 0 0 3px var(--sun), 0 0 0 5.5px var(--ink), 0 4px 0 5.5px var(--ink); animation: hop 0.9s ease-in-out infinite; }
+.player.active .nm::before { content: "▶ "; color: var(--sunset); }
+.player.offline { opacity: 0.45; filter: grayscale(0.8); }
+@keyframes hop { 50% { transform: translateY(-4px) rotate(-4deg); } }
+@media (prefers-reduced-motion: reduce) { .player.active .avatar { animation: none; } }
+
+/* 캐릭터 동그라미 (어디서나 같은 모양) */
+.avatar {
+  display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%;
+  border: 2.5px solid var(--ink); box-shadow: 0 3px 0 var(--ink); overflow: hidden; flex: none;
+}
+.avatar svg { width: 88%; height: 88%; margin-top: 6%; }
 .pool {
   display: grid; justify-items: center; line-height: 1; font-size: 18px; padding: 4px 8px; flex: none;
   background: var(--cream); border: 2.5px solid var(--ink); border-radius: 12px; box-shadow: 0 3px 0 var(--ink);
@@ -240,7 +253,9 @@ button, input { font: inherit; color: inherit; }
   position: relative; width: 100%; max-width: 380px; background: var(--cream); border: 3px solid var(--ink); border-radius: 24px;
   box-shadow: 0 7px 0 var(--ink); padding: 44px 20px 22px; display: grid; gap: 12px; text-align: center;
 }
-.sheet .mascot { position: absolute; width: 74px; left: 50%; top: -44px; transform: translateX(-50%) rotate(-6deg); animation: bob 1.8s ease-in-out infinite; }
+.sheet .mascot { position: absolute; width: 80px; left: 50%; top: -44px; transform: translateX(-50%) rotate(-6deg); animation: bob 1.8s ease-in-out infinite; }
+.sheet .mascot > svg { width: 100%; display: block; }
+.sheet .mascot .avatar.winner { width: 80px; height: 80px; border-width: 3px; box-shadow: 0 5px 0 var(--ink); }
 @keyframes bob { 50% { transform: translateX(-50%) rotate(6deg) translateY(-4px); } }
 @media (prefers-reduced-motion: reduce) { .sheet .mascot { animation: none; } }
 .sheet h2 { margin: 4px 0; font-size: 26px; font-weight: 400; }
@@ -252,6 +267,17 @@ button, input { font: inherit; color: inherit; }
 .scores .win td { background: #fff4c2; }
 .plus { color: #18924f; }
 .minus { color: #d63447; }
+
+.intro .sheet { padding-top: 24px; }
+.intro-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
+.intro-list li { display: grid; justify-items: center; gap: 4px; width: 84px; animation: pop 0.45s cubic-bezier(.3,1.6,.6,1) both; }
+.intro-list li:nth-child(2) { animation-delay: 0.12s; }
+.intro-list li:nth-child(3) { animation-delay: 0.24s; }
+.intro-list li:nth-child(4) { animation-delay: 0.36s; }
+.intro-list .avatar { width: 64px; height: 64px; border-width: 3px; box-shadow: 0 4px 0 var(--ink); }
+.intro-list b { font-weight: 400; font-size: 16px; max-width: 84px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.intro-list small { color: var(--muted); font-size: 13px; }
+@keyframes pop { from { transform: scale(0.3); opacity: 0; } }
 
 .toast {
   position: fixed; left: 50%; bottom: 220px; transform: translateX(-50%); z-index: 60; max-width: calc(100% - 32px);

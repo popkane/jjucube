@@ -6,6 +6,7 @@ import {
 } from './engine.js';
 import { DEFAULT_BOARD, segments, tableOf, findPlacement, place, tidy, blockOrder, arrangeTable } from './board.js';
 import { aiMove, LEVELS } from './ai.js';
+import { CHARACTERS, pickCharacters, avatarHtml } from './characters.js';
 import { playTile, unlockAudio, setSoundEnabled } from './sound.js';
 import {
   signIn, serverNow, seatList, createRoom, joinRoom, markOnline, watchRoom, startRoom, commitSync, setLive,
@@ -23,6 +24,9 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* 저장 못 해도 게임은 계속 */ } },
   del(k) { try { localStorage.removeItem(k); } catch { /* 무시 */ } },
 };
+
+// 결과 창 기본 마스코트(오징어) — 무승부일 때 다시 씀
+const SQUID_SVG = document.querySelector('#endMascot').innerHTML;
 
 // 조커 = 주문진 오징어
 const JOKER_SVG = '<svg viewBox="0 0 24 24" aria-label="조커"><path d="M12 1.5c4.2 3.8 6.4 7.2 6.4 11.8v2.2a2 2 0 0 1-2 2H7.6a2 2 0 0 1-2-2v-2.2C5.6 8.7 7.8 5.3 12 1.5z" fill="#ff8fa3" stroke="#2b2d42" stroke-width="1.4" stroke-linejoin="round"/><path d="M8.3 17.6v3.4M10.8 17.6v4.4M13.2 17.6v4.4M15.7 17.6v3.4" stroke="#2b2d42" stroke-width="1.6" stroke-linecap="round"/><circle cx="9.6" cy="12.6" r="1.4" fill="#2b2d42"/><circle cx="14.4" cy="12.6" r="1.4" fill="#2b2d42"/><path d="M10.7 14.8q1.3 1.1 2.6 0" fill="none" stroke="#2b2d42" stroke-width="1.1" stroke-linecap="round"/></svg>';
@@ -164,7 +168,7 @@ function enterCpu(level) {
   mode = 'cpu';
   cpuLevel = level;
   room = { seat: 0 };
-  names = [myName(), `컴퓨터(${LEVELS[level]})`];
+  names = [myName(), '컴퓨터'];
 }
 
 function startCpu(level, seconds) {
@@ -261,6 +265,7 @@ function applyState(s, newRev = rev + 1, draw = true) {
   busy = false;
   if (live && live.turn !== game.turn) live = null;
   showScreen('#game');
+  maybeIntro();
   if (game.status === 'ended') {
     work = null;
     workTurn = null;
@@ -308,9 +313,30 @@ $('#startBtn').addEventListener('click', () => withConn(async () => {
 }));
 $('#leaveLobbyBtn').addEventListener('click', () => leaveRoom());
 
+// 새 판: 엔진 상태 + 바닥 배치 + 사람마다 랜덤 동물 캐릭터 + 판 번호(gid, 캐릭터 소개를 한 번만 띄우려고)
 function freshGame(players, seconds) {
-  return { ...newGame({ players, config: { turnSeconds: seconds } }), layout: {}, board: { ...DEFAULT_BOARD } };
+  return {
+    ...newGame({ players, config: { turnSeconds: seconds } }),
+    layout: {}, board: { ...DEFAULT_BOARD },
+    chars: pickCharacters(players), gid: Math.random().toString(36).slice(2, 10),
+  };
 }
+const charsOf = (g) => g.chars || [0, 1, 2, 3];
+
+// 판이 새로 시작되면 이번 판 캐릭터를 잠깐 보여준다
+let introGid = null;
+function maybeIntro() {
+  if (!game || game.status !== 'playing' || game.gid === introGid) return;
+  introGid = game.gid;
+  if (game.turn > 2) return; // 이어하기로 들어온 판은 생략
+  const chars = charsOf(game);
+  $('#introList').innerHTML = names.map((name, p) => `<li>${avatarHtml(chars[p])}<b></b><small>${CHARACTERS[chars[p]].name}</small></li>`).join('');
+  [...$('#introList').children].forEach((li, p) => { li.querySelector('b').textContent = p === me() ? `${names[p]}(나)` : names[p]; });
+  $('#intro').hidden = false;
+  clearTimeout(maybeIntro.t);
+  maybeIntro.t = setTimeout(() => { $('#intro').hidden = true; }, 2600);
+}
+$('#intro').addEventListener('click', () => { $('#intro').hidden = true; });
 
 // ---------- 차례 ----------
 function beginTurn() {
@@ -486,15 +512,19 @@ function renderPlayers() {
   const box = $('#players');
   box.innerHTML = '';
   const online = mode === 'cpu' ? { 0: true, 1: true } : roomData?.online || {};
+  const chars = charsOf(game);
   names.forEach((name, p) => {
     let count = game.racks[p].length;
     if (p === me() && work) count = work.rack.length;
     else if (live && p === live.player) count = live.rack;
-    const chip = document.createElement('div');
-    chip.className = `player${p === game.current && game.status === 'playing' ? ' active' : ''}${online[p] ? '' : ' offline'}`;
-    chip.innerHTML = `<span class="dot"></span><span class="nm"></span><span class="count">${count}</span>${game.melded[p] ? '' : '<span class="tag">등록 전</span>'}`;
-    chip.querySelector('.nm').textContent = p === me() ? `${name}(나)` : name;
-    box.append(chip);
+    const turn = p === game.current && game.status === 'playing';
+    const card = document.createElement('div');
+    card.className = `player${turn ? ' active' : ''}${online[p] ? '' : ' offline'}${p === me() ? ' me' : ''}`;
+    card.innerHTML = `${avatarHtml(chars[p])}<span class="count">${count}</span>`
+      + `${game.melded[p] ? '' : '<span class="tag">등록 전</span>'}<span class="nm"></span>`;
+    card.querySelector('.nm').textContent = p === me() ? '나' : name;
+    card.title = `${name} (${CHARACTERS[chars[p]].name})`;
+    box.append(card);
   });
   $('#poolCount').textContent = game.pool.length;
 }
@@ -646,6 +676,8 @@ $('#menuQuit').addEventListener('click', () => leaveRoom());
 function showEnd() {
   const w = game.winner;
   $('#endTitle').textContent = w === null ? '무승부!' : w === me() ? '🎉 내가 이겼어요!' : `🎉 ${names[w]} 승리!`;
+  // 위에 뜨는 마스코트 = 이긴 사람 캐릭터 (무승부면 오징어 그대로)
+  $('#endMascot').innerHTML = w === null ? SQUID_SVG : avatarHtml(charsOf(game)[w], 'winner');
   const rows = $('#endRows');
   rows.innerHTML = '';
   const cls = (v) => (v > 0 ? 'plus' : v < 0 ? 'minus' : '');

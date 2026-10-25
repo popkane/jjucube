@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=9">
 </head>
 <body>
 
@@ -69,7 +69,6 @@
     <h1 class="logo" aria-label="강릉큐브">
       <span class="tile c-r"><span>강</span></span><span class="tile c-b"><span>릉</span></span><span class="tile c-y"><span>큐</span></span><span class="tile c-k"><span>브</span></span>
     </h1>
-    <p class="tagline">경포 바다에서 한 판! 🌊</p>
 
     <div id="homeMain" class="stack">
       <label class="field">
@@ -191,7 +190,7 @@
 <!-- 게임 끝 -->
 <div id="end" class="overlay" hidden>
   <div class="sheet">
-    <svg class="mascot" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 4c11 10 17 19 17 31v6a5 5 0 0 1-5 5H20a5 5 0 0 1-5-5v-6C15 23 21 14 32 4z" fill="#ff8fa3" stroke="#2b2d42" stroke-width="3" stroke-linejoin="round"/><path d="M17 22 8 27l8 4M47 22l9 5-8 4" fill="#ff8fa3" stroke="#2b2d42" stroke-width="3" stroke-linejoin="round"/><path d="M22 46v10M28 46v13M36 46v13M42 46v10" stroke="#2b2d42" stroke-width="3.5" stroke-linecap="round"/><circle cx="25" cy="34" r="3.5" fill="#2b2d42"/><circle cx="39" cy="34" r="3.5" fill="#2b2d42"/><circle cx="26.2" cy="32.8" r="1.2" fill="#fff"/><circle cx="40.2" cy="32.8" r="1.2" fill="#fff"/><path d="M28 39q4 3.5 8 0" fill="none" stroke="#2b2d42" stroke-width="2.5" stroke-linecap="round"/><ellipse cx="20" cy="39" rx="3.5" ry="2" fill="#ff5d8f"/><ellipse cx="44" cy="39" rx="3.5" ry="2" fill="#ff5d8f"/></svg>
+    <div id="endMascot" class="mascot"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 4c11 10 17 19 17 31v6a5 5 0 0 1-5 5H20a5 5 0 0 1-5-5v-6C15 23 21 14 32 4z" fill="#ff8fa3" stroke="#2b2d42" stroke-width="3" stroke-linejoin="round"/><path d="M17 22 8 27l8 4M47 22l9 5-8 4" fill="#ff8fa3" stroke="#2b2d42" stroke-width="3" stroke-linejoin="round"/><path d="M22 46v10M28 46v13M36 46v13M42 46v10" stroke="#2b2d42" stroke-width="3.5" stroke-linecap="round"/><circle cx="25" cy="34" r="3.5" fill="#2b2d42"/><circle cx="39" cy="34" r="3.5" fill="#2b2d42"/><circle cx="26.2" cy="32.8" r="1.2" fill="#fff"/><circle cx="40.2" cy="32.8" r="1.2" fill="#fff"/><path d="M28 39q4 3.5 8 0" fill="none" stroke="#2b2d42" stroke-width="2.5" stroke-linecap="round"/><ellipse cx="20" cy="39" rx="3.5" ry="2" fill="#ff5d8f"/><ellipse cx="44" cy="39" rx="3.5" ry="2" fill="#ff5d8f"/></svg></div>
     <h2 id="endTitle"></h2>
     <table class="scores">
       <thead><tr><th>이름</th><th>남은 타일</th><th>이번 판</th><th>누적</th></tr></thead>
@@ -203,8 +202,16 @@
   </div>
 </div>
 
+<!-- 이번 판 캐릭터 소개 -->
+<div id="intro" class="overlay intro" hidden>
+  <div class="sheet">
+    <h2>이번 판 친구들!</h2>
+    <ul id="introList" class="intro-list"></ul>
+  </div>
+</div>
+
 <div id="toast" class="toast" hidden></div>
 
-<script type="module" src="js/app.js"></script>
+<script type="module" src="js/app.js?v=9"></script>
 </body>
 </html>
