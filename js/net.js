@@ -9,7 +9,7 @@ import { firebaseConfig } from './firebase-config.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import {
-  getDatabase, ref, get, set, update, onValue, runTransaction, onDisconnect,
+  getDatabase, ref, get, set, update, remove, onValue, runTransaction, onDisconnect,
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 
 const app = initializeApp(firebaseConfig);
@@ -84,6 +84,11 @@ export function markOnline(code, seat) {
     onDisconnect(r).remove().then(() => set(r, true)).catch(() => {});
   });
   return () => { stop(); set(r, null).catch(() => {}); };
+}
+
+// 대기실에서 나가기: 방장이면 방을 닫고, 아니면 내 자리만 비운다
+export function leaveLobby(code, seat, host) {
+  return host ? remove(roomRef(code)) : set(roomRef(code, `seats/${seat}`), null);
 }
 
 export function watchRoom(code, cb) {

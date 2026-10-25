@@ -9,7 +9,7 @@ import { aiMove, LEVELS } from './ai.js';
 import { CHARACTERS, pickCharacters, avatarHtml } from './characters.js';
 import { playTile, playTurnBell, unlockAudio, setSoundEnabled } from './sound.js';
 import {
-  signIn, serverNow, seatList, createRoom, joinRoom, markOnline, watchRoom, startRoom, commitSync, setLive,
+  signIn, serverNow, seatList, createRoom, joinRoom, leaveLobby, markOnline, watchRoom, startRoom, commitSync, setLive,
 } from './net.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -226,7 +226,7 @@ function leaveRoom(goHome = true) {
 
 function onRoom(data) {
   if (!room) return;
-  if (!data || !data.meta) { toast('방이 없어졌어요'); leaveRoom(); return; }
+  if (!data || !data.meta) { toast('방장이 방을 닫았어요'); leaveRoom(); return; }
   roomData = data;
   const seats = seatList(data.seats);
   const seat = seats.findIndex((s) => s && s.uid === uid);
@@ -311,7 +311,12 @@ $('#startBtn').addEventListener('click', () => withConn(async () => {
   const m = { rounds: 0, totals: Array(players).fill(0) };
   await startRoom(room.code, players, { rev: (roomData.sync?.rev || 0) + 1, game: JSON.stringify(g), match: JSON.stringify(m), deadline: serverNow() + g.config.turnSeconds * 1000 });
 }));
-$('#leaveLobbyBtn').addEventListener('click', () => leaveRoom());
+$('#leaveLobbyBtn').addEventListener('click', () => {
+  // 먼저 방 감시를 끊고(내 화면에 '나와졌어요'가 안 뜨게) 그다음 자리를 비운다
+  const r = room && roomData?.meta?.status === 'lobby' ? { code: room.code, seat: room.seat, host: isHost() } : null;
+  leaveRoom();
+  if (r) leaveLobby(r.code, r.seat, r.host).catch(() => {});
+});
 
 // 새 판: 엔진 상태 + 바닥 배치 + 사람마다 랜덤 동물 캐릭터 + 판 번호(gid, 캐릭터 소개를 한 번만 띄우려고)
 function freshGame(players, seconds) {
@@ -765,7 +770,7 @@ document.addEventListener('pointermove', (e) => {
     press.grab = ids.indexOf(press.id);
     press.size = Math.max(30, geo.w - 3);
     const ghost = document.createElement('div');
-    ghost.className = 'ghost';
+    ghost.className = 'drag-ghost';
     ghost.style.setProperty('--gw', `${press.size}px`);
     for (const id of ids) ghost.append(tileEl(id));
     document.body.append(ghost);
