@@ -653,16 +653,35 @@ $('#undoBtn').addEventListener('click', () => {
   sendLive();
   render();
 });
+// 정돈은 모두의 테이블에: 지금 만지는 테이블과, 되돌리기·1장 받기 때 돌아갈 원래 테이블을 같이 정돈해서 올린다.
+// 타일을 만진 걸로 치지 않으므로 정돈한 뒤에도 바로 1장 받기를 할 수 있다.
 $('#tidyBtn').addEventListener('click', () => {
   if (!canAct()) return;
-  moves += 1;
+  const base = tidy(game.layout, game.board);
+  const baseBoard = { cols: base.board.cols, rows: Math.max(game.board.rows, base.board.rows) };
+  turnStart.layout = structuredClone(base.layout);
+  turnStart.board = { ...baseBoard };
   const t = tidy(work.layout, work.board);
   work.layout = t.layout;
   work.board = { cols: t.board.cols, rows: Math.max(work.board.rows, t.board.rows) };
   selected.clear();
+  commitLayout(base.layout, baseBoard);
   sendLive();
   render();
 });
+
+// 차례는 그대로 두고 테이블 배치만 바꿔서 올린다 (남은 시간도 그대로)
+async function commitLayout(layout, board) {
+  const next = { ...game, layout, board };
+  if (mode === 'cpu') {
+    game = next;
+    store.set(KEY.cpu, { game, match, level: cpuLevel });
+    return;
+  }
+  try {
+    await commitSync(room.code, rev, { game: JSON.stringify(next), match: JSON.stringify(match), deadline });
+  } catch { /* 정돈은 못 올려도 게임은 계속 */ }
+}
 $('#sortBtn').addEventListener('click', () => {
   sortBy = sortBy === 'number' ? 'color' : 'number';
   store.set(KEY.sort, sortBy);
