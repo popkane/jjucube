@@ -9,7 +9,7 @@ import { DEFAULT_BOARD, segments, tableOf, nearestFree, dropTiles, blockOrder, a
 import { syncRack, arrangeRack, rackCols, nearestFreeSlot, placeInRack, insertIntoRack, RACK_ROWS } from './rack.js';
 import { aiMove, LEVELS } from './ai.js';
 import { CHARACTERS, pickCharacters, avatarHtml } from './characters.js';
-import { playTile, playCollect, playShimmer, playTurnBell, playJoin, playStart, playWin, playClockTick, unlockAudio, setSoundEnabled } from './sound.js';
+import { playTile, playCollect, playShimmer, playTurnBell, playJoin, playStart, playWin, startClock, unlockAudio, setSoundEnabled } from './sound.js';
 import {
   signIn, serverNow, seatList, createRoom, joinRoom, leaveLobby, armLobbyCleanup, canResume, markOnline, watchRoom, startRoom, commitSync, setLive,
 } from './net.js';
@@ -56,7 +56,8 @@ let moves = 0;              // 이번 차례에 옮긴 횟수
 let startTableIds = new Set();
 let lobbySeen = { code: null, n: 0 }; // 대기실 인원 (들어올 때 소리)
 let endSoundGid = null;     // 승리 소리를 낸 판
-let tickKey = null;         // 초시계 소리를 낸 초 (rev:초)
+let clockRev = null;        // 초시계 소리를 예약한 차례(rev)
+let stopClock = () => {};
 let tableFor = null;        // 테이블을 그리던 판 (같은 판일 때만 날아가는 연출)
 const leftBoard = new Map(); // 방금 테이블에서 빠져 받침대로 돌아오는 타일 → 출발 위치
 let lastDrawKey = null;     // 상대가 받은 타일 연출을 이미 한 차례
@@ -591,12 +592,9 @@ function tick() {
     card.classList.toggle('hurry', shown <= 10000);
     card.querySelector('.secs').textContent = Math.ceil(shown / 1000);
   }
-  // 내 차례 남은 5초부터 1초마다 초시계 소리 (같은 초는 한 번만)
-  const sec = Math.ceil(shown / 1000);
-  if (isMyTurn() && left > 0 && sec <= 5 && tickKey !== `${rev}:${sec}`) {
-    tickKey = `${rev}:${sec}`;
-    playClockTick(sec);
-  }
+  // 내 차례 남은 5초부터 째깍째깍 (한 번 예약하면 끝까지 정확한 박자로, 차례가 끝나면 바로 멈춤)
+  if (clockRev !== null && (clockRev !== rev || !isMyTurn())) { stopClock(); clockRev = null; }
+  if (isMyTurn() && left > 300 && left <= 5000 && clockRev !== rev) { clockRev = rev; stopClock = startClock(left); }
   if (firedRev === rev || busy) return;
   if (isMyTurn() && left <= 0) { firedRev = rev; timeUp(); }
   // 차례인 사람이 연결이 끊겨 멈춰 있으면 다른 사람이 대신 벌칙 처리 (rev 확인으로 한 번만 들어감)

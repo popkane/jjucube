@@ -32,6 +32,7 @@ function click(t, freq, gain, decay) {
   src.connect(bp).connect(g).connect(ctx.destination);
   src.start(t);
   src.stop(t + decay + 0.01);
+  return src;
 }
 
 // 탁: 테이블이 울리는 낮은 소리
@@ -93,14 +94,25 @@ export function playTurnBell() {
   bell(t + 0.28, 523.25, 0.14); // 동 (도)
 }
 
-// 초시계 '똑딱' — 남은 시간 5초부터 1초마다. 마지막 1~2초는 조금 높고 크게(급한 느낌)
-export function playClockTick(secLeft) {
-  if (!enabled || !ctx || ctx.state !== 'running') return;
-  const t = ctx.currentTime + 0.005;
-  const urgent = secLeft <= 2;
-  const hi = secLeft % 2 === 1; // 똑·딱 번갈아
-  click(t, (hi ? 3400 : 2600) * (urgent ? 1.2 : 1), urgent ? 0.6 : 0.45, 0.025);
-  thud(t, hi ? 900 : 760, urgent ? 0.12 : 0.08, 0.04);
+// 긴박한 초시계 '째깍째깍' — 남은 시간(ms)부터 0까지 미리 예약해서 정확한 박자로 울린다.
+// 5~2초는 0.5초마다(째·깍 번갈아), 마지막 2초는 0.25초마다 더 빠르고 조금 크게. 돌려주는 함수를 부르면 멈춘다(차례가 끝났을 때)
+export function startClock(msLeft) {
+  if (!ready()) return () => {};
+  const now = ctx.currentTime;
+  const nodes = [];
+  const end = msLeft / 1000;
+  let n = 0;
+  for (let rem = Math.min(5, Math.floor(end * 4) / 4); rem > 0.001; rem -= rem > 2.001 ? 0.5 : 0.25) {
+    const t = now + (end - rem);
+    if (t < now) continue;
+    const urgent = rem <= 2.001;
+    const tick = n++ % 2 === 0;
+    const v = urgent ? 1.25 : 1;
+    // 째: 높고 날카롭게 / 깍: 조금 낮게. 금속 소리 + 짧은 울림
+    nodes.push(click(t, (tick ? 5200 : 3800), 0.55 * v, 0.012));
+    nodes.push(click(t + 0.004, (tick ? 2000 : 1500), 0.3 * v, 0.022));
+  }
+  return () => { for (const nd of nodes) { try { nd.stop(); } catch { /* 이미 끝남 */ } } };
 }
 
 // 타일 회수 '사라락': 여러 장이 미끄러져 돌아가는 소리 (되돌리기·시간 초과). soft = 상대 쪽이라 작게

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>강릉큐브 소리 듣기</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
+<style>
+  body { margin: 0; padding: 20px 16px 40px; font-family: 'Jua', sans-serif; background: #bfe6ff; color: #2b2d42; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  p { margin: 0 0 16px; font-size: 15px; opacity: 0.75; }
+  .list { display: grid; gap: 10px; max-width: 420px; }
+  button {
+    font: inherit; font-size: 18px; text-align: left; padding: 12px 16px; cursor: pointer;
+    background: #fff; border: 3px solid #2b2d42; border-radius: 16px; box-shadow: 0 4px 0 #2b2d42;
+  }
+  button small { display: block; font-size: 13px; opacity: 0.6; }
+  button:active { transform: translateY(3px); box-shadow: 0 1px 0 #2b2d42; }
+  button.main { background: #ffe08a; }
+</style>
+</head>
+<body>
+<h1>🔊 강릉큐브 소리 듣기</h1>
+<p>게임에서 나는 소리를 그대로 들어 볼 수 있어요. 무음 모드는 꺼 주세요.</p>
+<div class="list">
+  <button class="main" data-s="clock">⏱ 초시계 째깍째깍<small>내 차례 남은 5초부터 (마지막 2초는 더 빠르게)</small></button>
+  <button data-s="shimmer">🦑 조커 샤라랑<small>조커가 내 손에 들어올 때</small></button>
+  <button data-s="bell">🔔 띵동<small>내 차례가 됐을 때</small></button>
+  <button data-s="place">🀄 타일 놓기<small>내가 놓을 때 / 상대가 놓을 때(작게)</small></button>
+  <button data-s="collect">↩️ 사라락<small>타일이 받침대로 돌아올 때</small></button>
+  <button data-s="join">🚪 뾰롱<small>대기실에 누가 들어올 때</small></button>
+  <button data-s="start">🌊 빠라밤<small>판이 시작될 때</small></button>
+  <button data-s="win">🏆 승리<small>내가 이겼을 때 / 다른 사람이 이겼을 때</small></button>
+</div>
+<script type="module">
+  import * as S from './js/sound.js?v=preview2';
+  let stop = () => {};
+  const play = {
+    clock: () => { stop(); stop = S.startClock(5000); },
+    shimmer: () => S.playShimmer(),
+    bell: () => S.playTurnBell(),
+    place: () => { S.playTile('place'); setTimeout(() => S.playTile('opp'), 500); },
+    collect: () => S.playCollect(4),
+    join: () => S.playJoin(),
+    start: () => S.playStart(),
+    win: () => { S.playWin(true); setTimeout(() => S.playWin(false), 2200); },
+  };
+  document.querySelector('.list').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    S.unlockAudio();
+    // 휴대폰은 첫 터치 때 소리 장치가 켜지는 데 잠깐 걸려서 아주 조금 늦게 재생
+    setTimeout(play[b.dataset.s], 60);
+  });
+</script>
+</body>
+</html>
