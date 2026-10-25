@@ -1,14 +1,14 @@
 // 내 받침대 배치. 실제 받침대처럼 2줄짜리 판이고, 타일은 내가 놓은 자리에 그대로 있다(자동 정렬 없음).
 // pos = { [타일id]: [줄(0|1), 칸] }. 내 폰에만 있는 정보라 서버에는 안 올린다. 화면과 무관한 순수 함수만.
-import { analyzeSet, sortRack } from './engine.js';
+import { analyzeSet, sortRack, tileOf } from './engine.js';
 
 export const RACK_ROWS = 2;
-export const BASE_COLS = 10;
+export const BASE_COLS = 14; // 가로 화면 기준
 
 const rowOf = (pos, r) => Object.entries(pos).filter(([, [rr]]) => rr === r).map(([id, [, c]]) => [Number(id), c]).sort((a, b) => a[1] - b[1]);
 const lastCol = (pos, r) => rowOf(pos, r).reduce((m, [, c]) => Math.max(m, c), -1);
 
-// 칸 수: 기본 10칸. 줄마다 빈칸이 2칸 이상 남도록 늘린다 (그만큼 타일이 작아짐)
+// 칸 수: 기본 14칸. 줄마다 빈칸이 2칸 이상 남도록 늘린다 (그만큼 타일이 작아짐)
 export function rackCols(pos) {
   const n = Object.keys(pos).length;
   let maxCol = -1;
@@ -50,12 +50,35 @@ export function insertIntoRack(pos, ids, row, col) {
   return out;
 }
 
-// 한 번만 정렬: 숫자순/색깔순으로 윗줄부터 채운다
-export function arrangeRack(ids, by) {
+// 버튼을 누를 때만 한 번 정렬 (자동 정렬은 없음)
+//   by = 'color'  (789): 같은 색 연속 숫자끼리
+//   by = 'number' (777): 같은 숫자 다른 색끼리
+// 3장 이상 이어지는 묶음은 앞쪽에 모으고 묶음 뒤에 한 칸씩 띄운다. 나머지는 그 뒤에 붙여서. 묶음은 줄을 넘어가며 쪼개지 않는다.
+export function arrangeRack(ids, by, cols = BASE_COLS) {
   const sorted = sortRack(ids, by);
-  const cols = Math.ceil(sorted.length / RACK_ROWS); // 두 줄에 반반
+  const tiles = sorted.map(tileOf);
+  const follows = (a, b) => (by === 'color'
+    ? a.color === b.color && b.num === a.num + 1
+    : a.num === b.num && a.color !== b.color);
+  const chunks = [];
+  tiles.forEach((t, i) => {
+    const last = chunks[chunks.length - 1];
+    const prev = i > 0 ? tiles[i - 1] : null;
+    if (last && prev && !t.joker && !prev.joker && follows(prev, t)) last.push(sorted[i]);
+    else chunks.push([sorted[i]]);
+  });
+  const sets = chunks.filter((c) => c.length >= 3);
+  const rest = chunks.filter((c) => c.length < 3).flat();
   const out = {};
-  sorted.forEach((id, i) => { out[id] = [Math.floor(i / cols), i % cols]; });
+  let r = 0;
+  let c = 0;
+  const put = (group, gapAfter) => {
+    if (c > 0 && c + group.length > cols && r < RACK_ROWS - 1) { r += 1; c = 0; }
+    group.forEach((id) => { out[id] = [r, c++]; });
+    if (gapAfter) c += 1;
+  };
+  for (const s of sets) put(s, true);
+  for (const id of rest) put([id], false);
   return out;
 }
 

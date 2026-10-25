@@ -4,7 +4,7 @@ import {
   newGame, validateTurn, submitTurn, drawTile, penalize, analyzeSet, sortRack, tileOf, rackValue,
   TURN_SECONDS_OPTIONS, MIN_PLAYERS,
 } from './engine.js';
-import { DEFAULT_BOARD, segments, tableOf, findPlacement, place, placeFree, tidy, blockOrder, arrangeTable } from './board.js';
+import { DEFAULT_BOARD, segments, tableOf, placeAt, placeFree, tidy, blockOrder, arrangeTable } from './board.js';
 import { syncRack, insertIntoRack, arrangeRack, rackGroups, rackCols, RACK_ROWS } from './rack.js';
 import { aiMove, LEVELS } from './ai.js';
 import { CHARACTERS, pickCharacters, avatarHtml } from './characters.js';
@@ -53,7 +53,6 @@ let startTableIds = new Set();
 let selected = new Set();
 let busy = false;           // 서버에 올리는 중
 let firedRev = -1;          // 시간 초과 처리를 이 버전에서 이미 했는지
-let sortBy = store.get(KEY.sort) === 'color' ? 'color' : 'number';
 let geo = null;             // 지금 그려진 바닥의 크기 { w, h, rows, cols, el, preview }
 let rackPos = {};           // 내 받침대 배치 { id: [줄, 칸] } — 내 폰에만 저장
 let rackFor = null;         // rackPos가 어느 판·자리 것인지
@@ -65,12 +64,53 @@ const isMyTurn = () => !!game && game.status === 'playing' && game.current === m
 const dirty = () => moves > 0;
 const playedCount = () => (work && turnStart ? turnStart.rack.length - work.rack.length : 0);
 const canAct = () => isMyTurn() && !busy && !!work && workTurn === game.turn && $('#menu').hidden;
-const lockedIds = () => (game.melded[me()] ? null : startTableIds);
 // 받침대 정리는 내 차례가 아니어도 할 수 있다
 const canArrange = () => !!game && game.status === 'playing' && me() >= 0 && $('#menu').hidden;
 const rackIds = () => (isMyTurn() && work ? work.rack : game.racks[me()]);
 const usedRows = (layout) => Object.values(layout).reduce((m, [r]) => Math.max(m, r + 1), 0);
 const isHost = () => mode === 'cpu' || roomData?.meta?.host === uid;
+
+// ---------- 가로 틀 ----------
+// 화면은 항상 가로형 틀(STAGE_W × STAGE_H) 하나. 창 크기에 맞게 키우고, 폰을 세로로 들면 90도 돌려서 가로로 보이게 한다.
+const STAGE_W = 880;
+const STAGE_H = 400;
+const view = { s: 1, rot: false };
+function fitStage() {
+  const iw = innerWidth;
+  const ih = innerHeight;
+  view.rot = ih > iw;
+  view.s = view.rot ? Math.min(ih / STAGE_W, iw / STAGE_H) : Math.min(iw / STAGE_W, ih / STAGE_H);
+  const st = $('#stage');
+  st.style.transform = `translate(-50%, -50%) ${view.rot ? 'rotate(90deg) ' : ''}scale(${view.s})`;
+  // PC처럼 여백이 남으면 폰 모양 테두리를 보여준다
+  const spare = view.rot ? Math.min(iw - STAGE_H * view.s, ih - STAGE_W * view.s) : Math.min(iw - STAGE_W * view.s, ih - STAGE_H * view.s);
+  document.body.classList.toggle('framed', spare > 24 || Math.max(iw, ih) > 1100);
+}
+// 화면 좌표 → 틀 안 좌표
+function toStage(x, y) {
+  const dx = x - innerWidth / 2;
+  const dy = y - innerHeight / 2;
+  return view.rot
+    ? { x: dy / view.s + STAGE_W / 2, y: -dx / view.s + STAGE_H / 2 }
+    : { x: dx / view.s + STAGE_W / 2, y: dy / view.s + STAGE_H / 2 };
+}
+// 틀 안 좌표 → 화면 좌표
+function fromStage(x, y) {
+  const u = (x - STAGE_W / 2) * view.s;
+  const v = (y - STAGE_H / 2) * view.s;
+  return view.rot ? { x: innerWidth / 2 - v, y: innerHeight / 2 + u } : { x: innerWidth / 2 + u, y: innerHeight / 2 + v };
+}
+// 요소의 틀 안 위치 (스크롤 반영)
+function stagePos(el) {
+  const st = $('#stage');
+  let x = 0;
+  let y = 0;
+  for (let e = el; e && e !== st; e = e.offsetParent) { x += e.offsetLeft; y += e.offsetTop; }
+  for (let p = el.parentElement; p && p !== st; p = p.parentElement) { x -= p.scrollLeft; y -= p.scrollTop; }
+  return { x, y };
+}
+fitStage();
+addEventListener('resize', fitStage);
 
 function showScreen(id) {
   for (const s of ['#home', '#lobby', '#game']) $(s).hidden = s !== id;
@@ -498,20 +538,15 @@ function moveTiles(ids, dest) {
     render();
     return;
   }
-  const res = place(work.layout, viewBoard(), ids, dest.at, lockedIds());
-  if (!res) { toast('놓을 자리가 없어요'); render(); return; }
+  // 놓은 칸에 정확히 (타일이 있으면 그 줄을 오른쪽으로 밀어서 자리를 만듦)
+  const res = placeAt(work.layout, viewBoard(), ids, dest.at);
   moves += 1;
-  playTile(res.placement.merge ? 'snap' : 'place', ids.length);
+  playTile(res.pushed ? 'snap' : 'place', ids.length);
   work.layout = res.layout;
-  work.board = {
-    cols: res.board.cols,
-    rows: Math.max(work.board.rows, usedRows(res.layout), res.grew ? res.board.rows : 0),
-  };
+  work.board = { cols: Math.max(work.board.cols, res.board.cols), rows: Math.max(work.board.rows, usedRows(res.layout)) };
   const moved = new Set(ids);
   work.rack = work.rack.filter((id) => !moved.has(id));
-  if (res.grew) toast('자리가 모자라 테이블을 넓혔어요');
-  else if (res.tidied) toast('자리가 모자라 테이블을 정돈했어요');
-  sendLive(res.placement.merge);
+  sendLive(res.pushed);
   render();
 }
 
@@ -632,7 +667,8 @@ function renderRack() {
   const cols = rackCols(rackPos);
   const gap = 4;
   const W = box.clientWidth - 24;
-  const w = Math.max(16, Math.min(46, (W - gap * (cols - 1)) / cols));
+  const H = box.clientHeight - 24;
+  const w = Math.max(16, Math.min(48, (W - gap * (cols - 1)) / cols, (H - gap * (RACK_ROWS - 1)) / RACK_ROWS / RATIO));
   const h = w * RATIO;
   const grid = document.createElement('div');
   grid.className = 'rack-grid';
@@ -669,9 +705,10 @@ function renderRack() {
 }
 
 function rackCell(px, py) {
-  const rect = rackGeo.el.getBoundingClientRect();
-  const col = Math.max(0, Math.floor((px - rect.left + rackGeo.gap / 2) / (rackGeo.w + rackGeo.gap)));
-  const row = Math.min(RACK_ROWS - 1, Math.max(0, Math.floor((py - rect.top + rackGeo.gap / 2) / (rackGeo.h + rackGeo.gap))));
+  const s = toStage(px, py);
+  const o = stagePos(rackGeo.el);
+  const col = Math.max(0, Math.floor((s.x - o.x + rackGeo.gap / 2) / (rackGeo.w + rackGeo.gap)));
+  const row = Math.min(RACK_ROWS - 1, Math.max(0, Math.floor((s.y - o.y + rackGeo.gap / 2) / (rackGeo.h + rackGeo.gap))));
   return { row, col };
 }
 
@@ -693,7 +730,6 @@ function playFromRack(ids) {
 function renderControls() {
   const status = $('#status');
   const main = $('#mainBtn');
-  $('#sortBtn').textContent = sortBy === 'number' ? '숫자순 정렬' : '색깔순 정렬';
   const mine = canAct();
   $('#undoBtn').disabled = !mine || !dirty();
   $('#tidyBtn').hidden = !mine || Object.keys(work.layout).length === 0;
@@ -767,16 +803,16 @@ async function commitLayout(layout, board) {
     await commitSync(room.code, rev, { game: JSON.stringify(next), match: JSON.stringify(match), deadline });
   } catch { /* 정돈은 못 올려도 게임은 계속 */ }
 }
-$('#sortBtn').addEventListener('click', () => {
-  // 누를 때 한 번만 정렬하고, 다음엔 다른 방식으로
+// 789 = 같은 색 연속끼리, 777 = 같은 숫자끼리. 누를 때만 한 번 정렬 (조합 뒤에 한 칸씩 띄움)
+function arrangeBy(by) {
   if (!canArrange()) return;
-  rackPos = arrangeRack(rackIds(), sortBy);
+  rackPos = arrangeRack(rackIds(), by, rackGeo?.cols);
   saveRack();
   playTile('rack', 3);
-  sortBy = sortBy === 'number' ? 'color' : 'number';
-  store.set(KEY.sort, sortBy);
   render();
-});
+}
+$('#sortRunBtn').addEventListener('click', () => arrangeBy('color'));
+$('#sortGroupBtn').addEventListener('click', () => arrangeBy('number'));
 $('#mainBtn').addEventListener('click', () => {
   if (!canAct()) return;
   if (playedCount() > 0) finishTurn();
@@ -846,10 +882,10 @@ $('#homeBtn').addEventListener('click', () => leaveRoom());
 let press = null;
 
 function boardCell(x, y) {
-  const rect = geo.el.getBoundingClientRect();
+  const s = toStage(x, y);
+  const o = stagePos(geo.el);
   const clamp = (v, max) => Math.min(max - 1, Math.max(0, v));
-  const colF = (x - rect.left) / geo.w; // 칸 안에서 왼쪽/오른쪽 어디쯤인지까지
-  return { col: clamp(Math.floor(colF), geo.cols), colF, row: clamp(Math.floor((y - rect.top) / geo.h), geo.rows) };
+  return { col: clamp(Math.floor((s.x - o.x) / geo.w), geo.cols), row: clamp(Math.floor((s.y - o.y) / geo.h), geo.rows) };
 }
 
 // 놓을 곳: 받침대 / 바닥(칸) / 그 밖이면 null
@@ -865,15 +901,18 @@ function showPreview(dest, ids) {
   const pv = geo.preview;
   $('#rack').classList.toggle('over', dest?.type === 'rack');
   if (dest?.type !== 'board' || !canAct()) { pv.hidden = true; return; }
-  const p = findPlacement(work.layout, viewBoard(), ids, dest.at, lockedIds());
-  if (!p) { pv.hidden = true; return; }
+  const p = placeAt(work.layout, viewBoard(), ids, dest.at);
   pv.hidden = false;
-  pv.className = `preview${p.merge ? ' merge' : ''}`;
-  Object.assign(pv.style, { left: `${p.start * geo.w}px`, top: `${p.row * geo.h}px`, width: `${p.order.length * geo.w}px`, height: `${geo.h}px` });
+  pv.className = `preview${p.pushed ? ' push' : ''}`; // push = 그 자리 타일들이 오른쪽으로 밀림
+  Object.assign(pv.style, { left: `${p.start * geo.w}px`, top: `${p.row * geo.h}px`, width: `${p.count * geo.w}px`, height: `${geo.h}px` });
 }
 
+// 손가락 위치 → 끄는 타일 위치 (틀 안 좌표 sx, sy) + 그 지점의 화면 좌표 (x, y: 놓을 곳 찾기용)
 function pointOf(e) {
-  return { x: e.clientX, y: e.clientY - (press?.touch ? geo.h * 1.1 : 0) };
+  const s = toStage(e.clientX, e.clientY);
+  const sy = s.y - (press?.touch ? Math.max(geo.h, 40) * 1.1 : 0);
+  const c = fromStage(s.x, sy);
+  return { sx: s.x, sy, x: c.x, y: c.y };
 }
 
 document.addEventListener('pointerdown', (e) => {
@@ -899,13 +938,13 @@ document.addEventListener('pointermove', (e) => {
     ghost.className = 'drag-ghost';
     ghost.style.setProperty('--gw', `${press.size}px`);
     for (const id of ids) ghost.append(tileEl(id));
-    document.body.append(ghost);
+    $('#stage').append(ghost);
     press.ghost = ghost;
     for (const id of ids) document.querySelector(`#game .tile[data-id="${id}"]`)?.classList.add('lifted');
   }
   const pt = pointOf(e);
-  const gx = pt.x - press.grab * (press.size + 3) - press.size / 2;
-  const gy = pt.y - (press.size * RATIO) / 2;
+  const gx = pt.sx - press.grab * (press.size + 3) - press.size / 2;
+  const gy = pt.sy - (press.size * RATIO) / 2;
   press.ghost.style.transform = `translate(${gx}px, ${gy}px)`;
   showPreview(dropAt(pt.x, pt.y, press.grab), press.ids);
 });

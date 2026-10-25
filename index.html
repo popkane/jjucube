@@ -11,168 +11,183 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
-<link rel="stylesheet" href="css/style.css?v=202610251956">
+<link rel="stylesheet" href="css/style.css?v=202610252050">
 </head>
 <body>
+<!-- 모든 화면은 가로형 틀 하나(#stage) 안에. 창 크기에 맞춰 커지고, 폰을 세로로 들면 돌아간다 -->
+<div id="stage">
 
 <!-- 시작 화면 -->
 <section id="home" class="screen">
-  <div class="home-inner">
-    <svg class="scene" viewBox="0 0 360 210" role="img" aria-label="강릉 바다 해돋이">
-      <defs>
-        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9fe0ff"/><stop offset="1" stop-color="#fff1c9"/></linearGradient>
-      </defs>
-      <rect width="360" height="210" rx="22" fill="url(#sky)"/>
-      <!-- 구름 -->
-      <path d="M40 46a12 12 0 0 1 22-6a10 10 0 0 1 16 8h-38z" fill="#fff" stroke="#2b2d42" stroke-width="2.5" stroke-linejoin="round"/>
-      <path d="M262 34a10 10 0 0 1 18-5a9 9 0 0 1 14 7h-32z" fill="#fff" stroke="#2b2d42" stroke-width="2.5" stroke-linejoin="round"/>
-      <!-- 정동진 해 (웃는 얼굴) -->
-      <g class="sun">
-        <g stroke="#ff9f1c" stroke-width="4" stroke-linecap="round">
-          <path d="M180 58v-14M138 72l-9-9M222 72l9-9M122 108h-13M238 108h13"/>
+  <div class="home-grid">
+    <div class="home-art">
+      <svg class="scene" viewBox="0 0 360 210" role="img" aria-label="강릉 바다 해돋이">
+        <defs>
+          <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9fe0ff"/><stop offset="1" stop-color="#fff1c9"/></linearGradient>
+        </defs>
+        <rect width="360" height="210" rx="22" fill="url(#sky)"/>
+        <!-- 구름 -->
+        <path d="M40 46a12 12 0 0 1 22-6a10 10 0 0 1 16 8h-38z" fill="#fff" stroke="#2b2d42" stroke-width="2.5" stroke-linejoin="round"/>
+        <path d="M262 34a10 10 0 0 1 18-5a9 9 0 0 1 14 7h-32z" fill="#fff" stroke="#2b2d42" stroke-width="2.5" stroke-linejoin="round"/>
+        <!-- 정동진 해 (웃는 얼굴) -->
+        <g class="sun">
+          <g stroke="#ff9f1c" stroke-width="4" stroke-linecap="round">
+            <path d="M180 58v-14M138 72l-9-9M222 72l9-9M122 108h-13M238 108h13"/>
+          </g>
+          <circle cx="180" cy="118" r="46" fill="#ffc93c" stroke="#2b2d42" stroke-width="3"/>
+          <circle cx="165" cy="108" r="4" fill="#2b2d42"/><circle cx="195" cy="108" r="4" fill="#2b2d42"/>
+          <path d="M168 121q12 10 24 0" fill="none" stroke="#2b2d42" stroke-width="3" stroke-linecap="round"/>
+          <ellipse cx="156" cy="120" rx="6" ry="3.5" fill="#ff8fa3"/><ellipse cx="204" cy="120" rx="6" ry="3.5" fill="#ff8fa3"/>
         </g>
-        <circle cx="180" cy="118" r="46" fill="#ffc93c" stroke="#2b2d42" stroke-width="3"/>
-        <circle cx="165" cy="108" r="4" fill="#2b2d42"/><circle cx="195" cy="108" r="4" fill="#2b2d42"/>
-        <path d="M168 121q12 10 24 0" fill="none" stroke="#2b2d42" stroke-width="3" stroke-linecap="round"/>
-        <ellipse cx="156" cy="120" rx="6" ry="3.5" fill="#ff8fa3"/><ellipse cx="204" cy="120" rx="6" ry="3.5" fill="#ff8fa3"/>
-      </g>
-      <!-- 경포 바다 -->
-      <path d="M0 132q15-9 30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0V210H0z" fill="#3fa9f5" stroke="#2b2d42" stroke-width="3" stroke-linejoin="round"/>
-      <path d="M24 152q10-6 20 0M96 160q10-6 20 0M210 150q10-6 20 0M282 162q10-6 20 0" fill="none" stroke="#bfe8ff" stroke-width="3" stroke-linecap="round"/>
-      <!-- 모래사장 -->
-      <path d="M0 182q60-14 120-4t120-2t120 4V210H0z" fill="#f7dfa5" stroke="#2b2d42" stroke-width="3" stroke-linejoin="round"/>
-      <!-- 소나무 -->
-      <g stroke="#2b2d42" stroke-width="2.5" stroke-linejoin="round">
-        <path d="M40 190q2-30-4-58l8-1q4 30 2 59z" fill="#a0673a"/>
-        <path d="M14 140q24-14 50-2q-8 10-26 9q-16 0-24-7z" fill="#3f9b5b"/>
-        <path d="M20 118q20-12 40-1q-6 9-21 8q-13 0-19-7z" fill="#4fb36b"/>
-        <path d="M27 98q14-10 28 0q-5 7-15 6q-9 0-13-6z" fill="#5fc47a"/>
-      </g>
-      <!-- 경포대 정자 -->
-      <g stroke="#2b2d42" stroke-width="2.5" stroke-linejoin="round">
-        <path d="M270 184q30-34 74-6v10h-74z" fill="#7ccf7f"/>
-        <path d="M284 150h56l8 8h-72z" fill="#c0392b"/>
-        <path d="M280 146q32-16 64 0q-6 6-32 6t-32-6z" fill="#3d4a6b"/>
-        <path d="M290 158v18M312 158v18M334 158v18" stroke-width="3"/>
-        <path d="M284 176h56v5h-56z" fill="#e9d8b4"/>
-      </g>
-      <!-- 갈매기 -->
-      <path class="gull" d="M92 70q8-8 14 0q6-8 14 0" fill="none" stroke="#2b2d42" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-      <path class="gull" d="M232 82q5-5 9 0q4-5 9 0" fill="none" stroke="#2b2d42" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-      <!-- 안목 커피 -->
-      <g stroke="#2b2d42" stroke-width="2.5" stroke-linejoin="round" transform="translate(78 -6)">
-        <path d="M150 186h22l-3 16h-16z" fill="#fff"/>
-        <path d="M172 190q7 0 6 5t-7 4" fill="none"/>
-        <path d="M156 180q-3-4 0-8M164 180q-3-4 0-8" fill="none" stroke-width="2" stroke-linecap="round"/>
-      </g>
-    </svg>
-    <h1 class="logo" aria-label="강릉큐브">
-      <span class="tile c-r"><span>강</span></span><span class="tile c-b"><span>릉</span></span><span class="tile c-y"><span>큐</span></span><span class="tile c-k"><span>브</span></span>
-    </h1>
+        <!-- 경포 바다 -->
+        <path d="M0 132q15-9 30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0V210H0z" fill="#3fa9f5" stroke="#2b2d42" stroke-width="3" stroke-linejoin="round"/>
+        <path d="M24 152q10-6 20 0M96 160q10-6 20 0M210 150q10-6 20 0M282 162q10-6 20 0" fill="none" stroke="#bfe8ff" stroke-width="3" stroke-linecap="round"/>
+        <!-- 모래사장 -->
+        <path d="M0 182q60-14 120-4t120-2t120 4V210H0z" fill="#f7dfa5" stroke="#2b2d42" stroke-width="3" stroke-linejoin="round"/>
+        <!-- 소나무 -->
+        <g stroke="#2b2d42" stroke-width="2.5" stroke-linejoin="round">
+          <path d="M40 190q2-30-4-58l8-1q4 30 2 59z" fill="#a0673a"/>
+          <path d="M14 140q24-14 50-2q-8 10-26 9q-16 0-24-7z" fill="#3f9b5b"/>
+          <path d="M20 118q20-12 40-1q-6 9-21 8q-13 0-19-7z" fill="#4fb36b"/>
+          <path d="M27 98q14-10 28 0q-5 7-15 6q-9 0-13-6z" fill="#5fc47a"/>
+        </g>
+        <!-- 경포대 정자 -->
+        <g stroke="#2b2d42" stroke-width="2.5" stroke-linejoin="round">
+          <path d="M270 184q30-34 74-6v10h-74z" fill="#7ccf7f"/>
+          <path d="M284 150h56l8 8h-72z" fill="#c0392b"/>
+          <path d="M280 146q32-16 64 0q-6 6-32 6t-32-6z" fill="#3d4a6b"/>
+          <path d="M290 158v18M312 158v18M334 158v18" stroke-width="3"/>
+          <path d="M284 176h56v5h-56z" fill="#e9d8b4"/>
+        </g>
+        <!-- 갈매기 -->
+        <path class="gull" d="M92 70q8-8 14 0q6-8 14 0" fill="none" stroke="#2b2d42" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        <path class="gull" d="M232 82q5-5 9 0q4-5 9 0" fill="none" stroke="#2b2d42" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- 안목 커피 -->
+        <g stroke="#2b2d42" stroke-width="2.5" stroke-linejoin="round" transform="translate(78 -6)">
+          <path d="M150 186h22l-3 16h-16z" fill="#fff"/>
+          <path d="M172 190q7 0 6 5t-7 4" fill="none"/>
+          <path d="M156 180q-3-4 0-8M164 180q-3-4 0-8" fill="none" stroke-width="2" stroke-linecap="round"/>
+        </g>
+      </svg>
 
-    <div id="homeMain" class="stack">
-      <label class="field">
-        <span class="label">내 이름</span>
-        <input id="myName" class="text-input" maxlength="8" placeholder="이름">
-      </label>
-      <button id="resumeBtn" class="btn primary wide" hidden>이어하기</button>
-      <button id="resumeCpuBtn" class="btn primary wide" hidden>컴퓨터전 이어하기</button>
-      <div class="modes">
-        <button class="mode-card" id="createCard">
-          <span class="ic">🏖️</span><b>방 만들기</b><small>방 번호를 만들어 상대에게 알려줘요 (2~4명)</small>
-        </button>
-        <button class="mode-card" id="joinCard">
-          <span class="ic">🚪</span><b>방 들어가기</b><small>받은 방 번호 4자리를 넣어요</small>
-        </button>
-        <button class="mode-card" id="cpuCard">
-          <span class="ic">🦑</span><b>컴퓨터와 1:1</b><small>혼자 연습해요 (초보·중수·고수)</small>
-        </button>
-      </div>
+      <h1 class="logo" aria-label="강릉큐브">
+        <span class="tile c-r"><span>강</span></span><span class="tile c-b"><span>릉</span></span><span class="tile c-y"><span>큐</span></span><span class="tile c-k"><span>브</span></span>
+      </h1>
     </div>
-
-    <form id="createForm" class="stack" hidden>
-      <div class="field">
-        <span class="label">최대 인원</span>
-        <div class="seg" data-name="players">
-          <button type="button" data-v="2" class="on">2명</button><button type="button" data-v="3">3명</button><button type="button" data-v="4">4명</button>
+    <div class="home-side">
+      <div id="homeMain" class="stack">
+        <label class="field row-field">
+          <span class="label">내 이름</span>
+          <input id="myName" class="text-input" maxlength="8" placeholder="이름">
+        </label>
+        <button id="resumeBtn" class="btn primary wide" hidden>이어하기</button>
+        <button id="resumeCpuBtn" class="btn primary wide" hidden>컴퓨터전 이어하기</button>
+        <div class="modes">
+          <button class="mode-card" id="createCard"><span class="ic">🏖️</span><b>방 만들기</b><small>방 번호를 만들어 알려줘요 (2~4명)</small></button>
+          <button class="mode-card" id="joinCard"><span class="ic">🚪</span><b>방 들어가기</b><small>받은 방 번호 4자리를 넣어요</small></button>
+          <button class="mode-card" id="cpuCard"><span class="ic">🦑</span><b>컴퓨터와 1:1</b><small>혼자 연습해요 (초보·중수·고수)</small></button>
         </div>
       </div>
-      <div class="field">
-        <span class="label">한 차례 제한 시간</span>
-        <div class="seg" data-name="seconds">
-          <button type="button" data-v="60" class="on">60초</button><button type="button" data-v="90">90초</button><button type="button" data-v="120">120초</button>
-        </div>
-      </div>
-      <button type="submit" class="btn primary wide">방 만들기</button>
-      <button type="button" class="btn ghost wide back-btn">뒤로</button>
-    </form>
 
-    <form id="joinForm" class="stack" hidden>
-      <label class="field">
-        <span class="label">방 번호</span>
-        <input id="joinCode" class="text-input code-input" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="0000" autocomplete="off">
-      </label>
-      <button type="submit" class="btn primary wide">들어가기</button>
-      <button type="button" class="btn ghost wide back-btn">뒤로</button>
-    </form>
-
-    <form id="cpuForm" class="stack" hidden>
-      <div class="field">
-        <span class="label">컴퓨터 실력</span>
-        <div class="seg" data-name="level">
-          <button type="button" data-v="easy" class="on">초보</button><button type="button" data-v="normal">중수</button><button type="button" data-v="hard">고수</button>
+      <form id="createForm" class="stack" hidden>
+        <div class="field">
+          <span class="label">최대 인원</span>
+          <div class="seg" data-name="players">
+            <button type="button" data-v="2" class="on">2명</button><button type="button" data-v="3">3명</button><button type="button" data-v="4">4명</button>
+          </div>
         </div>
-      </div>
-      <div class="field">
-        <span class="label">한 차례 제한 시간</span>
-        <div class="seg" data-name="seconds">
-          <button type="button" data-v="60" class="on">60초</button><button type="button" data-v="90">90초</button><button type="button" data-v="120">120초</button>
+        <div class="field">
+          <span class="label">한 차례 제한 시간</span>
+          <div class="seg" data-name="seconds">
+            <button type="button" data-v="60" class="on">60초</button><button type="button" data-v="90">90초</button><button type="button" data-v="120">120초</button>
+          </div>
         </div>
-      </div>
-      <button type="submit" class="btn primary wide">시작</button>
-      <button type="button" class="btn ghost wide back-btn">뒤로</button>
-    </form>
+        <div class="btn-row">
+          <button type="button" class="btn ghost back-btn">뒤로</button>
+          <button type="submit" class="btn primary">방 만들기</button>
+        </div>
+      </form>
 
-    <p id="connState" class="muted center">연결 중…</p>
+      <form id="joinForm" class="stack" hidden>
+        <label class="field">
+          <span class="label">방 번호</span>
+          <input id="joinCode" class="text-input code-input" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="0000" autocomplete="off">
+        </label>
+        <div class="btn-row">
+          <button type="button" class="btn ghost back-btn">뒤로</button>
+          <button type="submit" class="btn primary">들어가기</button>
+        </div>
+      </form>
+
+      <form id="cpuForm" class="stack" hidden>
+        <div class="field">
+          <span class="label">컴퓨터 실력</span>
+          <div class="seg" data-name="level">
+            <button type="button" data-v="easy" class="on">초보</button><button type="button" data-v="normal">중수</button><button type="button" data-v="hard">고수</button>
+          </div>
+        </div>
+        <div class="field">
+          <span class="label">한 차례 제한 시간</span>
+          <div class="seg" data-name="seconds">
+            <button type="button" data-v="60" class="on">60초</button><button type="button" data-v="90">90초</button><button type="button" data-v="120">120초</button>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="btn ghost back-btn">뒤로</button>
+          <button type="submit" class="btn primary">시작</button>
+        </div>
+      </form>
+
+      <p id="connState" class="muted center">연결 중…</p>
+    </div>
   </div>
 </section>
 
 <!-- 대기실 -->
 <section id="lobby" class="screen" hidden>
-  <div class="home-inner">
-    <p class="label center">방 번호</p>
-    <div id="lobbyCode" class="room-code"></div>
-    <p class="muted center">상대에게 이 번호를 알려주세요</p>
-    <ul id="lobbySeats" class="seats"></ul>
-    <p id="lobbyInfo" class="muted center"></p>
-    <button id="startBtn" class="btn primary wide" hidden>시작</button>
-    <button id="leaveLobbyBtn" class="btn ghost wide">나가기</button>
+  <div class="lobby-grid">
+    <div class="lobby-code">
+      <p class="label center">방 번호</p>
+      <div id="lobbyCode" class="room-code"></div>
+      <p class="muted center">상대에게 이 번호를 알려주세요</p>
+      <p id="lobbyInfo" class="muted center"></p>
+    </div>
+    <div class="lobby-side">
+      <ul id="lobbySeats" class="seats"></ul>
+      <div class="btn-row">
+        <button id="leaveLobbyBtn" class="btn ghost">나가기</button>
+        <button id="startBtn" class="btn primary" hidden>시작</button>
+      </div>
+    </div>
   </div>
 </section>
 
-<!-- 게임 화면 -->
+<!-- 게임 화면: 왼쪽 캐릭터 / 가운데 테이블·받침대 / 오른쪽 버튼 -->
 <section id="game" class="screen" hidden>
-  <header class="hud">
-    <button id="menuBtn" class="icon-btn" aria-label="메뉴">≡</button>
-    <div id="players" class="players"></div>
-    <div class="pool" title="남은 타일"><span id="poolCount">0</span><small>남음</small></div>
-  </header>
+  <aside id="players" class="side-left"></aside>
 
-  <div class="table-wrap">
-    <main id="table" class="table"></main>
-    <button id="tidyBtn" class="tidy-btn" hidden>🧹 정돈</button>
+  <div class="center">
+    <div class="table-wrap">
+      <main id="table" class="table"></main>
+      <button id="tidyBtn" class="tidy-btn" hidden>🧹 정돈</button>
+    </div>
+    <div class="status-row">
+      <div id="status" class="status"></div>
+      <div class="timer"><div id="timerBar" class="timer-bar"></div><span id="timerText" class="timer-text"></span></div>
+    </div>
+    <div id="rack" class="rack" data-drop="rack"></div>
   </div>
 
-  <footer class="dock">
-    <div class="timer"><div id="timerBar" class="timer-bar"></div><span id="timerText" class="timer-text"></span></div>
-    <div id="status" class="status"></div>
-    <div id="rack" class="rack" data-drop="rack"></div>
-    <div class="controls">
-      <button id="undoBtn" class="btn">되돌리기</button>
-      <button id="sortBtn" class="btn">숫자순</button>
-      <button id="mainBtn" class="btn primary">1장 받기</button>
+  <aside class="side-right">
+    <button id="menuBtn" class="icon-btn" aria-label="메뉴">≡</button>
+    <div class="sort-btns">
+      <button id="sortRunBtn" class="btn sort-btn" title="같은 색 연속끼리 정렬">789</button>
+      <button id="sortGroupBtn" class="btn sort-btn" title="같은 숫자끼리 정렬">777</button>
     </div>
-  </footer>
+    <button id="undoBtn" class="btn">되돌리기</button>
+    <div class="pool" title="남은 타일"><span id="poolCount">0</span><small>남음</small></div>
+    <button id="mainBtn" class="btn primary main-btn">1장 받기</button>
+  </aside>
 </section>
 
 <!-- 메뉴 -->
@@ -196,9 +211,11 @@
       <thead><tr><th>이름</th><th>남은 타일</th><th>이번 판</th><th>누적</th></tr></thead>
       <tbody id="endRows"></tbody>
     </table>
-    <button id="againBtn" class="btn primary wide">한 판 더</button>
+    <div class="btn-row">
+      <button id="homeBtn" class="btn ghost">방 나가기</button>
+      <button id="againBtn" class="btn primary">한 판 더</button>
+    </div>
     <p id="againInfo" class="muted" hidden>방장이 한 판 더 시작할 수 있어요</p>
-    <button id="homeBtn" class="btn ghost wide">방 나가기</button>
   </div>
 </div>
 
@@ -212,19 +229,21 @@
 
 <div id="toast" class="toast" hidden></div>
 
+</div>
+
 <!-- 모든 모듈을 같은 버전으로 받게 하는 목록 (node bump.mjs 가 다시 만듦) -->
 <script type="importmap">
 {
   "imports": {
-    "./js/ai.js": "./js/ai.js?v=202610251956",
-    "./js/app.js": "./js/app.js?v=202610251956",
-    "./js/board.js": "./js/board.js?v=202610251956",
-    "./js/characters.js": "./js/characters.js?v=202610251956",
-    "./js/engine.js": "./js/engine.js?v=202610251956",
-    "./js/firebase-config.js": "./js/firebase-config.js?v=202610251956",
-    "./js/net.js": "./js/net.js?v=202610251956",
-    "./js/rack.js": "./js/rack.js?v=202610251956",
-    "./js/sound.js": "./js/sound.js?v=202610251956"
+    "./js/ai.js": "./js/ai.js?v=202610252050",
+    "./js/app.js": "./js/app.js?v=202610252050",
+    "./js/board.js": "./js/board.js?v=202610252050",
+    "./js/characters.js": "./js/characters.js?v=202610252050",
+    "./js/engine.js": "./js/engine.js?v=202610252050",
+    "./js/firebase-config.js": "./js/firebase-config.js?v=202610252050",
+    "./js/net.js": "./js/net.js?v=202610252050",
+    "./js/rack.js": "./js/rack.js?v=202610252050",
+    "./js/sound.js": "./js/sound.js?v=202610252050"
   }
 }
 </script>
@@ -239,6 +258,6 @@
     if (el && el.textContent === '연결 중…') el.textContent = '연결이 오래 걸려요. 새로고침해 보시고, 카톡 안에서 열었다면 크롬·사파리로 열어 주세요';
   }, 10000);
 </script>
-<script type="module" src="js/app.js?v=202610251956"></script>
+<script type="module" src="js/app.js?v=202610252050"></script>
 </body>
 </html>
