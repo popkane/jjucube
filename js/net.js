@@ -91,6 +91,23 @@ export function leaveLobby(code, seat, host) {
   return host ? remove(roomRef(code)) : set(roomRef(code, `seats/${seat}`), null);
 }
 
+// 대기실에서 창을 닫거나 연결이 끊기면 서버가 알아서: 방장이면 방을 지우고, 아니면 내 자리만 비운다.
+// 돌려주는 함수를 부르면 취소 (게임이 시작되면 취소해서, 잠깐 끊겨도 방이 안 없어지게)
+export function armLobbyCleanup(code, seat, host) {
+  const r = host ? roomRef(code) : roomRef(code, `seats/${seat}`);
+  onDisconnect(r).remove().catch(() => {});
+  return () => { onDisconnect(r).cancel().catch(() => {}); };
+}
+
+// 이어할 수 있는 방인지: 방이 있고, 내가 앉아 있고, 게임이 아직 진행 중
+export async function canResume(code, uid) {
+  const room = (await get(roomRef(code))).val();
+  if (!room?.meta || room.meta.status !== 'playing' || !room.sync) return false;
+  if (serverNow() - (room.sync.deadline || 0) > 6 * 3600 * 1000) return false; // 6시간 넘게 아무도 안 둔 판은 버려진 것
+  if (!seatList(room.seats).some((s) => s && s.uid === uid)) return false;
+  try { return JSON.parse(room.sync.game).status === 'playing'; } catch { return false; }
+}
+
 export function watchRoom(code, cb) {
   return onValue(roomRef(code), (snap) => cb(snap.val()));
 }

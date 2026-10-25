@@ -9,7 +9,7 @@ import { aiMove, LEVELS } from './ai.js';
 import { CHARACTERS, pickCharacters, avatarHtml } from './characters.js';
 import { playTile, playTurnBell, unlockAudio, setSoundEnabled } from './sound.js';
 import {
-  signIn, serverNow, seatList, createRoom, joinRoom, leaveLobby, markOnline, watchRoom, startRoom, commitSync, setLive,
+  signIn, serverNow, seatList, createRoom, joinRoom, leaveLobby, armLobbyCleanup, canResume, markOnline, watchRoom, startRoom, commitSync, setLive,
 } from './net.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -81,9 +81,17 @@ function showHome() {
   $('#createForm').hidden = true;
   $('#joinForm').hidden = true;
   $('#cpuForm').hidden = true;
+  // 온라인 이어하기는 그 방에서 게임이 아직 진행 중일 때만 보여준다 (끝났거나 없어진 방이면 기억도 지움)
+  $('#resumeBtn').hidden = true;
   const saved = store.get(KEY.room);
-  $('#resumeBtn').hidden = !saved;
-  if (saved) $('#resumeBtn').textContent = `이어하기 (방 ${saved})`;
+  if (saved) {
+    ready.then(() => canResume(saved, uid)).then((ok) => {
+      if (!ok) { if (store.get(KEY.room) === saved) store.del(KEY.room); return; }
+      if (store.get(KEY.room) !== saved || $('#home').hidden) return;
+      $('#resumeBtn').textContent = `이어하기 (방 ${saved})`;
+      $('#resumeBtn').hidden = false;
+    }).catch(() => {});
+  }
   const cpuSaved = store.get(KEY.cpu);
   $('#resumeCpuBtn').hidden = !cpuSaved;
   if (cpuSaved) $('#resumeCpuBtn').textContent = `컴퓨터전 이어하기 (${LEVELS[cpuSaved.level]})`;
@@ -212,6 +220,7 @@ function leaveRoom(goHome = true) {
   clearTimeout(cpuTimer);
   room?.unwatch?.();
   room?.unonline?.();
+  room?.disarm?.();
   mode = null;
   room = null;
   roomData = null;
@@ -233,7 +242,12 @@ function onRoom(data) {
   if (seat < 0) { toast('방에서 나와졌어요'); leaveRoom(); return; }
   room.seat = seat;
 
-  if (data.meta.status === 'lobby' || !data.sync) { renderLobby(seats); return; }
+  if (data.meta.status === 'lobby' || !data.sync) {
+    if (!room.disarm) room.disarm = armLobbyCleanup(room.code, seat, data.meta.host === uid);
+    renderLobby(seats);
+    return;
+  }
+  if (room.disarm) { room.disarm(); room.disarm = null; }
 
   const sync = data.sync;
   if (sync.rev !== rev) {
@@ -276,7 +290,8 @@ function applyState(s, newRev = rev + 1, draw = true) {
     if (!isMyTurn()) { work = null; workTurn = null; }
   }
   if (mode === 'cpu') {
-    store.set(KEY.cpu, { game, match, level: cpuLevel });
+    if (game.status === 'ended') store.del(KEY.cpu); // 끝난 판은 이어하기에서 뺀다
+    else store.set(KEY.cpu, { game, match, level: cpuLevel });
     if (game.status === 'playing' && game.current === CPU) scheduleCpu();
   }
   if (draw) render();
@@ -823,10 +838,11 @@ function toast(msg) {
 }
 
 // ---------- 시작 ----------
-showHome();
-signIn().then((id) => {
+const ready = signIn().then((id) => {
   uid = id;
   $('#connState').textContent = '';
 }).catch((e) => {
   $('#connState').textContent = `연결 실패: ${e.message}`;
+  throw e;
 });
+showHome();
