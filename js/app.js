@@ -1,0 +1,698 @@
+// 루미뀨브 화면. 규칙 판단은 engine.js, 바닥 배치는 board.js, 온라인은 net.js에 맡기고
+// 여기서는 그리기·조작·타이머만 한다. 각자 자기 폰으로 같은 방에 들어와서 한다.
+import {
+  newGame, validateTurn, submitTurn, drawTile, penalize, analyzeSet, sortRack, tileOf, rackValue,
+  TURN_SECONDS_OPTIONS, MIN_PLAYERS,
+} from './engine.js';
+import { DEFAULT_BOARD, segments, tableOf, findPlacement, place, tidy, blockOrder } from './board.js';
+import { playTile, unlockAudio, setSoundEnabled } from './sound.js';
+import {
+  signIn, serverNow, seatList, createRoom, joinRoom, markOnline, watchRoom, startRoom, commitSync, setLive,
+} from './net.js';
+
+const $ = (sel) => document.querySelector(sel);
+const KEY = { sort: 'rumikyub.sort', sound: 'rumikyub.sound', name: 'rumikyub.name', room: 'rumikyub.room', setup: 'rumikyub.setup' };
+const RATIO = 1.36; // 타일 세로/가로
+const STALL_MS = 5000; // 차례인 사람이 시간 넘기고도 이만큼 반응이 없으면 다른 사람이 대신 벌칙 처리
+
+// localStorage는 막혀 있을 수 있으니 항상 try로 감싼다
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* 저장 못 해도 게임은 계속 */ } },
+  del(k) { try { localStorage.removeItem(k); } catch { /* 무시 */ } },
+};
+
+const JOKER_SVG = '<svg viewBox="0 0 24 24" aria-label="조커"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2.4"/><circle cx="8.5" cy="10" r="1.7" fill="currentColor"/><circle cx="15.5" cy="10" r="1.7" fill="currentColor"/><path d="M7.5 14.5q4.5 4.2 9 0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
+
+// ---------- 상태 ----------
+let uid = null;
+let room = null;            // { code, seat, unwatch }
+let roomData = null;        // 마지막으로 받은 방 전체
+let rev = -1;               // 지금 보고 있는 게임 버전 (sync.rev)
+let game = null;            // 엔진 상태 + 바닥 배치(layout, board)
+let match = null;           // 여러 판 누적 점수 { rounds, totals }
+let deadline = 0;           // 이번 차례가 끝나는 서버 시각
+let names = [];
+let live = null;            // 상대가 지금 만지는 중인 테이블 { turn, player, layout, board, rack }
+let liveRaw = null;
+let work = null;            // 내 차례에 만지는 중인 { layout, board, rack }
+let workTurn = null;        // work가 몇 번째 차례 것인지
+let turnStart = null;       // 차례 시작 때의 work (되돌리기 = 여기로 전부 되돌림)
+let moves = 0;              // 이번 차례에 옮긴 횟수
+let startTableIds = new Set();
+let selected = new Set();
+let busy = false;           // 서버에 올리는 중
+let firedRev = -1;          // 시간 초과 처리를 이 버전에서 이미 했는지
+let sortBy = store.get(KEY.sort) === 'color' ? 'color' : 'number';
+let geo = null;             // 지금 그려진 바닥의 크기 { w, h, rows, cols, el, preview }
+const setup = { players: 2, seconds: 60, ...store.get(KEY.setup) };
+
+const me = () => room?.seat ?? -1;
+const isMyTurn = () => !!game && game.status === 'playing' && game.current === me();
+const dirty = () => moves > 0;
+const playedCount = () => (work && turnStart ? turnStart.rack.length - work.rack.length : 0);
+const canAct = () => isMyTurn() && !busy && !!work && workTurn === game.turn && $('#menu').hidden;
+const lockedIds = () => (game.melded[me()] ? null : startTableIds);
+const usedRows = (layout) => Object.values(layout).reduce((m, [r]) => Math.max(m, r + 1), 0);
+const isHost = () => roomData?.meta?.host === uid;
+
+function showScreen(id) {
+  for (const s of ['#home', '#lobby', '#game']) $(s).hidden = s !== id;
+}
+
+// ---------- 시작 화면 ----------
+$('#myName').value = store.get(KEY.name) || '';
+$('#myName').addEventListener('input', () => store.set(KEY.name, $('#myName').value.trim()));
+const myName = () => $('#myName').value.trim() || '이름없음';
+
+function showHome() {
+  showScreen('#home');
+  for (const id of ['#menu', '#end']) $(id).hidden = true;
+  $('#homeMain').hidden = false;
+  $('#createForm').hidden = true;
+  $('#joinForm').hidden = true;
+  const saved = store.get(KEY.room);
+  $('#resumeBtn').hidden = !saved;
+  if (saved) $('#resumeBtn').textContent = `이어하기 (방 ${saved})`;
+}
+
+function renderSegs() {
+  for (const seg of document.querySelectorAll('.seg')) {
+    const v = String(setup[seg.dataset.name]);
+    for (const b of seg.children) b.classList.toggle('on', b.dataset.v === v);
+  }
+}
+for (const seg of document.querySelectorAll('.seg')) {
+  seg.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    setup[seg.dataset.name] = Number(b.dataset.v);
+    renderSegs();
+  });
+}
+
+$('#createCard').addEventListener('click', () => {
+  $('#homeMain').hidden = true;
+  $('#createForm').hidden = false;
+  renderSegs();
+});
+$('#joinCard').addEventListener('click', () => {
+  $('#homeMain').hidden = true;
+  $('#joinForm').hidden = false;
+  $('#joinCode').value = '';
+  $('#joinCode').focus();
+});
+for (const b of document.querySelectorAll('.back-btn')) b.addEventListener('click', showHome);
+
+async function withConn(fn) {
+  if (!uid) { toast('아직 연결 중이에요. 잠시 후 다시 눌러 주세요'); return; }
+  try { await fn(); } catch (e) { toast(e.message || '연결에 실패했어요'); }
+}
+
+$('#createForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (!TURN_SECONDS_OPTIONS.includes(setup.seconds)) setup.seconds = 60;
+  store.set(KEY.setup, setup);
+  withConn(async () => enterRoom(await createRoom({ uid, name: myName(), players: setup.players, seconds: setup.seconds })));
+});
+$('#joinForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const code = $('#joinCode').value.trim();
+  if (!/^\d{4}$/.test(code)) { toast('방 번호 4자리를 넣어 주세요'); return; }
+  withConn(async () => enterRoom(await joinRoom({ code, uid, name: myName() })));
+});
+$('#resumeBtn').addEventListener('click', () => {
+  const code = store.get(KEY.room);
+  withConn(async () => {
+    try { enterRoom(await joinRoom({ code, uid, name: myName() })); } catch (err) { store.del(KEY.room); showHome(); throw err; }
+  });
+});
+
+// ---------- 방 ----------
+function enterRoom({ code, seat }) {
+  leaveRoom(false);
+  room = { code, seat, unwatch: watchRoom(code, onRoom), unonline: markOnline(code, seat) };
+  store.set(KEY.room, code);
+}
+
+function leaveRoom(goHome = true) {
+  room?.unwatch?.();
+  room?.unonline?.();
+  room = null;
+  roomData = null;
+  rev = -1;
+  game = null;
+  work = null;
+  workTurn = null;
+  live = null;
+  liveRaw = null;
+  if (goHome) { store.del(KEY.room); showHome(); }
+}
+
+function onRoom(data) {
+  if (!room) return;
+  if (!data || !data.meta) { toast('방이 없어졌어요'); leaveRoom(); return; }
+  roomData = data;
+  const seats = seatList(data.seats);
+  const seat = seats.findIndex((s) => s && s.uid === uid);
+  if (seat < 0) { toast('방에서 나와졌어요'); leaveRoom(); return; }
+  room.seat = seat;
+
+  if (data.meta.status === 'lobby' || !data.sync) { renderLobby(seats); return; }
+
+  const sync = data.sync;
+  if (sync.rev !== rev) {
+    rev = sync.rev;
+    game = JSON.parse(sync.game);
+    match = JSON.parse(sync.match);
+    deadline = sync.deadline;
+    names = Array.from({ length: game.players }, (_, i) => seats[i]?.name || `플레이어${i + 1}`);
+    startTableIds = new Set(game.table.flat());
+    busy = false;
+    if (live && live.turn !== game.turn) live = null;
+    showScreen('#game');
+    if (game.status === 'ended') {
+      work = null;
+      workTurn = null;
+      showEnd();
+    } else {
+      $('#end').hidden = true;
+      if (isMyTurn() && workTurn !== game.turn) beginTurn();
+      if (!isMyTurn()) { work = null; workTurn = null; }
+    }
+  }
+
+  // 상대가 만지는 중인 테이블 (내 차례면 무시)
+  const raw = data.live || null;
+  if (raw !== liveRaw) {
+    liveRaw = raw;
+    const l = raw ? JSON.parse(raw) : null;
+    const fresh = l && game && l.turn === game.turn && l.player === game.current && !isMyTurn() ? l : null;
+    if (fresh && live && fresh.moves > live.moves) playTile(fresh.snap ? 'snap' : 'place', 1);
+    live = fresh;
+  }
+  if (!press) render(); // 끄는 도중에는 다시 그리지 않음 (끝나면 그림)
+  else renderPlayers();
+}
+
+function renderLobby(seats) {
+  showScreen('#lobby');
+  const meta = roomData.meta;
+  $('#lobbyCode').textContent = room.code;
+  const list = $('#lobbySeats');
+  list.innerHTML = '';
+  for (let i = 0; i < meta.players; i++) {
+    const li = document.createElement('li');
+    const s = seats[i];
+    li.className = s ? 'filled' : '';
+    li.textContent = s ? `${s.name}${s.uid === uid ? ' (나)' : ''}${s.uid === meta.host ? ' · 방장' : ''}` : '기다리는 중…';
+    list.append(li);
+  }
+  const count = seats.filter(Boolean).length;
+  $('#startBtn').hidden = !isHost();
+  $('#startBtn').disabled = count < MIN_PLAYERS;
+  $('#startBtn').textContent = count < meta.players ? `지금 ${count}명으로 시작` : '시작';
+  $('#lobbyInfo').textContent = isHost()
+    ? (count < MIN_PLAYERS ? '상대가 들어오면 시작할 수 있어요' : `한 차례 ${meta.seconds}초`)
+    : `방장이 시작하기를 기다리는 중… (한 차례 ${meta.seconds}초)`;
+}
+
+$('#startBtn').addEventListener('click', () => withConn(async () => {
+  const seats = seatList(roomData.seats).filter(Boolean);
+  const players = seats.length;
+  const g = freshGame(players, roomData.meta.seconds);
+  const m = { rounds: 0, totals: Array(players).fill(0) };
+  await startRoom(room.code, players, { rev: (roomData.sync?.rev || 0) + 1, game: JSON.stringify(g), match: JSON.stringify(m), deadline: serverNow() + g.config.turnSeconds * 1000 });
+}));
+$('#leaveLobbyBtn').addEventListener('click', () => leaveRoom());
+
+function freshGame(players, seconds) {
+  return { ...newGame({ players, config: { turnSeconds: seconds } }), layout: {}, board: { ...DEFAULT_BOARD } };
+}
+
+// ---------- 차례 ----------
+function beginTurn() {
+  work = { layout: structuredClone(game.layout), board: { ...game.board }, rack: [...game.racks[me()]] };
+  workTurn = game.turn;
+  turnStart = structuredClone(work);
+  moves = 0;
+  selected.clear();
+  live = null;
+  toast('내 차례예요!');
+  navigator.vibrate?.(60);
+}
+
+// 결과를 서버에 올린다. 다음 화면은 서버에서 바뀐 값이 돌아올 때(onRoom) 그린다.
+async function commit(next, quiet = false) {
+  if (busy) return;
+  busy = true;
+  render();
+  let m = match;
+  if (next.status === 'ended' && game.status !== 'ended') {
+    m = { rounds: match.rounds + 1, totals: match.totals.map((t, i) => t + next.scores[i]) };
+  }
+  const sync = { game: JSON.stringify(next), match: JSON.stringify(m), deadline: serverNow() + next.config.turnSeconds * 1000 };
+  try {
+    const ok = await commitSync(room.code, rev, sync);
+    if (!ok) { busy = false; if (!quiet) toast('다른 변경이 먼저 들어왔어요'); render(); }
+  } catch (e) {
+    busy = false;
+    toast(`올리지 못했어요: ${e.message}`);
+    render();
+  }
+}
+
+function finishTurn() {
+  const r = submitTurn(game, me(), tableOf(work.layout));
+  if (!r.ok) { toast(r.error); render(); return; }
+  // 바닥 배치는 엔진이 모르는 정보라 여기서 붙여 준다 (벌칙·가져오기는 원래 배치 그대로)
+  commit({ ...r.state, layout: work.layout, board: work.board });
+}
+
+function timeUp() {
+  // 시간이 다 됐을 때 맞는 조합이면 그대로 내고, 아니면 원래대로 되돌리고 벌칙
+  if (work && playedCount() > 0 && validateTurn(game, me(), tableOf(work.layout)).ok) {
+    toast('시간 끝 — 놓은 대로 냈어요');
+    finishTurn();
+  } else {
+    toast(game.pool.length ? `시간 초과 — ${Math.min(game.config.penaltyDraws, game.pool.length)}장 받았어요` : '시간 초과 — 넘겼어요');
+    commit(penalize(game, me()));
+  }
+}
+
+// 상대 이름 + 한 일
+function describeLast() {
+  const l = game.last;
+  if (!l) return '';
+  const who = names[l.player];
+  if (l.action === 'play') return `${who}: ${l.count}장 냈어요`;
+  if (l.action === 'draw') return `${who}: 1장 받았어요`;
+  if (l.action === 'penalty') return `${who}: 시간 초과로 ${l.count}장 받았어요`;
+  return `${who}: 낼 게 없어 넘겼어요`;
+}
+
+// ---------- 라이브 (상대에게 내 손놀림 보여주기) ----------
+let liveTimer = 0;
+let lastSnap = false;
+function sendLive(snap = false) {
+  if (!room || !isMyTurn()) return;
+  lastSnap = snap;
+  clearTimeout(liveTimer);
+  liveTimer = setTimeout(() => {
+    if (!isMyTurn() || !work) return;
+    setLive(room.code, JSON.stringify({
+      turn: game.turn, player: me(), layout: work.layout, board: work.board, rack: work.rack.length, moves, snap: lastSnap,
+    })).catch(() => {});
+  }, 120);
+}
+
+// ---------- 타이머 (모두의 화면에서 같은 시각 기준) ----------
+setInterval(tick, 250);
+function tick() {
+  if (!game || $('#game').hidden) return;
+  const bar = $('#timerBar');
+  if (game.status !== 'playing') { bar.style.width = '0%'; $('#timerText').textContent = ''; return; }
+  const total = game.config.turnSeconds * 1000;
+  const left = deadline - serverNow();
+  const shown = Math.max(0, Math.min(total, left));
+  bar.style.width = `${(shown / total) * 100}%`;
+  bar.classList.toggle('warn', shown <= 10000);
+  $('#timerText').textContent = `${isMyTurn() ? '내 차례' : names[game.current]} ${Math.ceil(shown / 1000)}초`;
+  if (firedRev === rev || busy) return;
+  if (isMyTurn() && left <= 0) { firedRev = rev; timeUp(); }
+  // 차례인 사람이 연결이 끊겨 멈춰 있으면 다른 사람이 대신 벌칙 처리 (rev 확인으로 한 번만 들어감)
+  else if (!isMyTurn() && left <= -STALL_MS) { firedRev = rev; commit(penalize(game, game.current), true); }
+}
+
+// ---------- 타일 옮기기 ----------
+function moveError(ids, dest) {
+  const fromTable = ids.some((id) => startTableIds.has(id));
+  if (fromTable && !game.melded[me()]) return '첫 등록 전에는 테이블 조합을 건드릴 수 없어요';
+  if (fromTable && dest?.type === 'rack') return '테이블에 있던 타일은 받침대로 가져올 수 없어요';
+  return null;
+}
+
+// 화면에 보이는 만큼을 바닥 크기로 쓴다 (저장된 줄 수보다 화면이 크면 그만큼 더 쓸 수 있음)
+const viewBoard = () => (geo ? { cols: geo.cols, rows: geo.rows } : work.board);
+
+// dest: { type: 'rack' } 또는 { type: 'board', at: { row, col, grab } }
+function moveTiles(ids, dest) {
+  const err = moveError(ids, dest);
+  if (err) { toast(err); selected.clear(); render(); return; }
+  selected.clear();
+  if (dest.type === 'rack') {
+    ids = ids.filter((id) => !work.rack.includes(id));
+    if (ids.length === 0) { render(); return; }
+    moves += 1;
+    for (const id of ids) delete work.layout[id];
+    work.rack.push(...ids);
+    playTile('rack', ids.length);
+    sendLive();
+    render();
+    return;
+  }
+  const res = place(work.layout, viewBoard(), ids, dest.at, lockedIds());
+  if (!res) { toast('놓을 자리가 없어요'); render(); return; }
+  moves += 1;
+  playTile(res.placement.merge ? 'snap' : 'place', ids.length);
+  work.layout = res.layout;
+  work.board = {
+    cols: res.board.cols,
+    rows: Math.max(work.board.rows, usedRows(res.layout), res.grew ? res.board.rows : 0),
+  };
+  const moved = new Set(ids);
+  work.rack = work.rack.filter((id) => !moved.has(id));
+  if (res.grew) toast('자리가 모자라 테이블을 넓혔어요');
+  else if (res.tidied) toast('자리가 모자라 테이블을 정돈했어요');
+  sendLive(res.placement.merge);
+  render();
+}
+
+function toggleSelect(id) {
+  if (selected.has(id)) { selected.delete(id); render(); return; }
+  const err = moveError([id]);
+  if (err) { toast(err); return; }
+  selected.add(id);
+  render();
+}
+
+// ---------- 그리기 ----------
+function tileEl(id) {
+  const t = tileOf(id);
+  const el = document.createElement('div');
+  el.className = `tile ${t.joker ? 'joker' : `c-${t.color}`}`;
+  el.dataset.id = id;
+  el.innerHTML = t.joker ? JOKER_SVG : `<span>${t.num}</span>`;
+  if (selected.has(id)) el.classList.add('selected');
+  return el;
+}
+
+function render() {
+  if (!game || $('#game').hidden) return;
+  renderPlayers();
+  renderTable();
+  renderRack();
+  renderControls();
+}
+
+function renderPlayers() {
+  if (!game) return;
+  const box = $('#players');
+  box.innerHTML = '';
+  const online = roomData?.online || {};
+  names.forEach((name, p) => {
+    let count = game.racks[p].length;
+    if (p === me() && work) count = work.rack.length;
+    else if (live && p === live.player) count = live.rack;
+    const chip = document.createElement('div');
+    chip.className = `player${p === game.current && game.status === 'playing' ? ' active' : ''}${online[p] ? '' : ' offline'}`;
+    chip.innerHTML = `<span class="dot"></span><span class="nm"></span><span class="count">${count}</span>${game.melded[p] ? '' : '<span class="tag">등록 전</span>'}`;
+    chip.querySelector('.nm').textContent = p === me() ? `${name}(나)` : name;
+    box.append(chip);
+  });
+  $('#poolCount').textContent = game.pool.length;
+}
+
+// 바닥: 화면 너비에 칸 수를 맞추고, 쓰는 줄이 화면보다 많아지면 타일을 줄여서 다 보이게 한다
+function renderTable() {
+  const box = $('#table');
+  box.innerHTML = '';
+  const src = (isMyTurn() && work) || live || game;
+  const { layout, board } = src;
+  const W = box.clientWidth - 16;
+  const H = box.clientHeight - 16;
+  const needRows = Math.max(board.rows, usedRows(layout));
+  const w = Math.max(18, Math.min(48, W / board.cols, H / (needRows * RATIO)));
+  const h = w * RATIO;
+  const rows = Math.max(needRows, Math.floor(H / h));
+  const el = document.createElement('div');
+  el.className = 'board';
+  el.style.width = `${board.cols * w}px`;
+  el.style.height = `${rows * h}px`;
+  el.style.setProperty('--tw', `${w - 3}px`);
+
+  for (const seg of segments(layout)) {
+    const s = document.createElement('div');
+    s.className = `segbox${analyzeSet(seg.ids).valid ? '' : ' invalid'}`;
+    Object.assign(s.style, { left: `${seg.start * w}px`, top: `${seg.row * h}px`, width: `${seg.ids.length * w}px`, height: `${h}px` });
+    el.append(s);
+  }
+  for (const [key, [r, c]] of Object.entries(layout)) {
+    const id = Number(key);
+    const t = tileEl(id);
+    t.style.left = `${c * w + 1.5}px`;
+    t.style.top = `${r * h + 1.5}px`;
+    if (!startTableIds.has(id)) t.classList.add('fresh');
+    el.append(t);
+  }
+  if (Object.keys(layout).length === 0) {
+    const hint = document.createElement('div');
+    hint.className = 'board-hint';
+    hint.textContent = isMyTurn() ? '받침대 타일을 끌어서 바닥 아무 데나 놓으세요' : '';
+    el.append(hint);
+  }
+  const preview = document.createElement('div');
+  preview.className = 'preview';
+  preview.hidden = true;
+  el.append(preview);
+  box.append(el);
+  geo = { w, h, rows, cols: board.cols, el, preview };
+}
+
+function renderRack() {
+  const box = $('#rack');
+  box.innerHTML = '';
+  if (me() < 0 || !game) return;
+  const rack = isMyTurn() && work ? work.rack : game.racks[me()];
+  for (const id of sortRack(rack, sortBy)) box.append(tileEl(id));
+  box.classList.toggle('waiting', !isMyTurn());
+}
+
+function renderControls() {
+  const status = $('#status');
+  const main = $('#mainBtn');
+  $('#sortBtn').textContent = sortBy === 'number' ? '숫자순' : '색깔순';
+  const mine = canAct();
+  $('#undoBtn').disabled = !mine || !dirty();
+  $('#tidyBtn').hidden = !mine || Object.keys(work.layout).length === 0;
+  if (game.status !== 'playing') { main.disabled = true; status.textContent = ''; return; }
+  if (!isMyTurn()) {
+    main.textContent = '상대 차례';
+    main.disabled = true;
+    status.className = 'status';
+    status.textContent = describeLast() || `${names[game.current]} 차례예요`;
+    return;
+  }
+  if (busy) { main.disabled = true; status.className = 'status'; status.textContent = '올리는 중…'; return; }
+
+  // 받침대에서 한 장도 안 냈으면 '1장 받기' (테이블을 만졌어도 받으면 원래대로 돌아감)
+  if (playedCount() === 0) {
+    main.textContent = game.pool.length ? '1장 받기' : '넘기기';
+    main.disabled = !mine;
+    status.className = 'status';
+    status.textContent = dirty()
+      ? '받침대에서 타일을 내지 않으면 테이블은 원래대로 돌아가요'
+      : game.melded[me()]
+        ? '타일을 내거나 1장 받으세요'
+        : `첫 등록: 내 타일로 합 ${game.config.initialMeldPoints} 이상`;
+    return;
+  }
+  const v = validateTurn(game, me(), tableOf(work.layout));
+  main.textContent = '끝내기';
+  main.disabled = !mine || !v.ok;
+  status.className = `status ${v.ok ? 'ok' : 'err'}`;
+  status.textContent = v.ok ? `✓ 낼 수 있어요 (${v.played.length}장)` : v.error;
+}
+
+addEventListener('resize', () => { if (!press) render(); });
+
+// ---------- 버튼 ----------
+// 되돌리기: 이번 차례에 한 것을 전부 처음으로
+$('#undoBtn').addEventListener('click', () => {
+  if (!canAct()) return;
+  work = structuredClone(turnStart);
+  moves = 0;
+  selected.clear();
+  sendLive();
+  render();
+});
+$('#tidyBtn').addEventListener('click', () => {
+  if (!canAct()) return;
+  moves += 1;
+  const t = tidy(work.layout, work.board);
+  work.layout = t.layout;
+  work.board = { cols: t.board.cols, rows: Math.max(work.board.rows, t.board.rows) };
+  selected.clear();
+  sendLive();
+  render();
+});
+$('#sortBtn').addEventListener('click', () => {
+  sortBy = sortBy === 'number' ? 'color' : 'number';
+  store.set(KEY.sort, sortBy);
+  render();
+});
+$('#mainBtn').addEventListener('click', () => {
+  if (!canAct()) return;
+  if (playedCount() > 0) finishTurn();
+  else commit(drawTile(game, me()));
+});
+
+let soundOn = store.get(KEY.sound) !== false;
+setSoundEnabled(soundOn);
+const renderSoundBtn = () => { $('#soundBtn').textContent = `소리: ${soundOn ? '켜짐' : '꺼짐'}`; };
+$('#menuBtn').addEventListener('click', () => {
+  renderSoundBtn();
+  $('#menuRoom').textContent = room ? `방 번호 ${room.code}` : '';
+  $('#menu').hidden = false;
+});
+$('#menuClose').addEventListener('click', () => { $('#menu').hidden = true; render(); });
+$('#soundBtn').addEventListener('click', () => {
+  soundOn = !soundOn;
+  setSoundEnabled(soundOn);
+  store.set(KEY.sound, soundOn);
+  renderSoundBtn();
+  if (soundOn) { unlockAudio(); playTile('place'); }
+});
+$('#menuQuit').addEventListener('click', () => leaveRoom());
+
+// ---------- 게임 끝 ----------
+function showEnd() {
+  const w = game.winner;
+  $('#endTitle').textContent = w === null ? '무승부!' : w === me() ? '🎉 내가 이겼어요!' : `🎉 ${names[w]} 승리!`;
+  const rows = $('#endRows');
+  rows.innerHTML = '';
+  const cls = (v) => (v > 0 ? 'plus' : v < 0 ? 'minus' : '');
+  const sign = (v) => `${v > 0 ? '+' : ''}${v}`;
+  names.forEach((name, p) => {
+    const tr = document.createElement('tr');
+    if (p === w) tr.className = 'win';
+    const sc = game.scores[p];
+    tr.innerHTML = `<td></td><td>${game.racks[p].length}장 (${rackValue(game.racks[p])})</td><td class="${cls(sc)}">${sign(sc)}</td><td class="${cls(match.totals[p])}">${sign(match.totals[p])}</td>`;
+    tr.firstChild.textContent = name;
+    rows.append(tr);
+  });
+  $('#againBtn').hidden = !isHost();
+  $('#againInfo').hidden = isHost();
+  $('#end').hidden = false;
+}
+$('#againBtn').addEventListener('click', () => withConn(async () => {
+  const g = freshGame(game.players, game.config.turnSeconds);
+  const ok = await commitSync(room.code, rev, { game: JSON.stringify(g), match: JSON.stringify(match), deadline: serverNow() + g.config.turnSeconds * 1000 });
+  if (ok) setLive(room.code, null).catch(() => {});
+}));
+$('#homeBtn').addEventListener('click', () => leaveRoom());
+
+// ---------- 끌기 / 누르기 ----------
+// 타일을 짧게 누르면 선택, 끌면 이동. 선택한 상태에서 끌면 선택한 타일이 같이 움직인다.
+// 손가락으로 끌 때는 타일이 손가락에 가리지 않게 조금 위에 띄우고, 그 띄운 위치를 기준으로 놓는다.
+let press = null;
+
+function boardCell(x, y) {
+  const rect = geo.el.getBoundingClientRect();
+  const clamp = (v, max) => Math.min(max - 1, Math.max(0, v));
+  return { col: clamp(Math.floor((x - rect.left) / geo.w), geo.cols), row: clamp(Math.floor((y - rect.top) / geo.h), geo.rows) };
+}
+
+// 놓을 곳: 받침대 / 바닥(칸) / 그 밖이면 null
+function dropAt(x, y, grab) {
+  const el = document.elementFromPoint(x, y);
+  if (!el) return null;
+  if (el.closest('#rack')) return { type: 'rack' };
+  if (el.closest('#table')) return { type: 'board', at: { ...boardCell(x, y), grab } };
+  return null;
+}
+
+function showPreview(dest, ids) {
+  const pv = geo.preview;
+  $('#rack').classList.toggle('over', dest?.type === 'rack');
+  if (dest?.type !== 'board') { pv.hidden = true; return; }
+  const p = findPlacement(work.layout, viewBoard(), ids, dest.at, lockedIds());
+  if (!p) { pv.hidden = true; return; }
+  pv.hidden = false;
+  pv.className = `preview${p.merge ? ' merge' : ''}`;
+  Object.assign(pv.style, { left: `${p.start * geo.w}px`, top: `${p.row * geo.h}px`, width: `${p.order.length * geo.w}px`, height: `${geo.h}px` });
+}
+
+function pointOf(e) {
+  return { x: e.clientX, y: e.clientY - (press?.touch ? geo.h * 1.1 : 0) };
+}
+
+document.addEventListener('pointerdown', (e) => {
+  unlockAudio();
+  const tile = e.target.closest('#game .tile[data-id]');
+  if (!tile || !canAct()) return;
+  press = { id: Number(tile.dataset.id), x: e.clientX, y: e.clientY, touch: e.pointerType !== 'mouse', dragging: false };
+});
+
+document.addEventListener('pointermove', (e) => {
+  if (!press) return;
+  if (!press.dragging) {
+    if (Math.hypot(e.clientX - press.x, e.clientY - press.y) < 8) return;
+    const ids = blockOrder(selected.has(press.id) ? [...selected] : [press.id]);
+    const err = moveError(ids);
+    if (err) { toast(err); press = null; return; }
+    press.dragging = true;
+    press.ids = ids;
+    press.grab = ids.indexOf(press.id);
+    press.size = Math.max(30, geo.w - 3);
+    const ghost = document.createElement('div');
+    ghost.className = 'ghost';
+    ghost.style.setProperty('--gw', `${press.size}px`);
+    for (const id of ids) ghost.append(tileEl(id));
+    document.body.append(ghost);
+    press.ghost = ghost;
+    for (const id of ids) document.querySelector(`#game .tile[data-id="${id}"]`)?.classList.add('lifted');
+  }
+  const pt = pointOf(e);
+  const gx = pt.x - press.grab * (press.size + 3) - press.size / 2;
+  const gy = pt.y - (press.size * RATIO) / 2;
+  press.ghost.style.transform = `translate(${gx}px, ${gy}px)`;
+  showPreview(dropAt(pt.x, pt.y, press.grab), press.ids);
+});
+
+function endPress(e, cancelled) {
+  if (!press) return;
+  const p = press;
+  $('#rack').classList.remove('over');
+  if (!p.dragging) {
+    press = null;
+    if (!cancelled && canAct()) toggleSelect(p.id);
+    return;
+  }
+  const pt = pointOf(e);
+  press = null;
+  p.ghost.remove();
+  // 끄는 도중에 시간이 다 돼서 차례가 넘어갔으면 놓지 않음
+  const dest = cancelled || !canAct() ? null : dropAt(pt.x, pt.y, p.grab);
+  if (dest) moveTiles(p.ids, dest);
+  else render();
+}
+document.addEventListener('pointerup', (e) => endPress(e, false));
+document.addEventListener('pointercancel', (e) => endPress(e, true));
+
+// 선택해 둔 타일을 바닥의 빈 곳이나 받침대를 눌러서 옮기기
+document.addEventListener('click', (e) => {
+  if (!canAct() || !selected.size || e.target.closest('.tile[data-id]')) return;
+  const ids = blockOrder([...selected]);
+  if (e.target.closest('#rack')) moveTiles(ids, { type: 'rack' });
+  else if (e.target.closest('#table')) moveTiles(ids, { type: 'board', at: { ...boardCell(e.clientX, e.clientY), grab: 0 } });
+});
+
+// ---------- 알림 ----------
+let toastTimer = 0;
+function toast(msg) {
+  const el = $('#toast');
+  el.textContent = msg;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, 2200);
+}
+
+// ---------- 시작 ----------
+showHome();
+signIn().then((id) => {
+  uid = id;
+  $('#connState').textContent = '';
+}).catch((e) => {
+  $('#connState').textContent = `연결 실패: ${e.message}`;
+});
