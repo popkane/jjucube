@@ -758,8 +758,8 @@ function renderTable() {
   const H = box.clientHeight - 12;
   const cols = Math.max(board.cols, usedCols(layout));
   let needRows = Math.max(board.rows, usedRows(layout));
-  // 줄마다 타일이 있으면 새 조합을 놓을 빈 줄을 하나 더 (공식 앱도 테이블이 차면 판이 늘며 타일이 작아짐)
-  if (new Set(Object.values(layout).map(([r]) => r)).size >= needRows) needRows += 1;
+  // 3장짜리 새 조합을 놓을 빈칸이 어디에도 없을 때만 빈 줄을 하나 더 (그 전까지는 타일을 크게)
+  if (!hasRoom(layout, cols, needRows, 3)) needRows += 1;
   const w = Math.max(16, Math.min(52, W / cols, H / (needRows * RATIO)));
   const h = w * RATIO;
   const rows = Math.max(needRows, Math.floor(H / h));
@@ -810,6 +810,19 @@ function renderTable() {
 }
 
 // ---------- 칸 사이를 오가는 타일 (테이블 ↔ 받침대 ↔ 캐릭터 ↔ 더미): 틀 위에 그림자 타일을 띄워 날린다 ----------
+// 어느 줄에든 k장을 다른 조합과 안 붙게 놓을 빈칸이 있는지
+function hasRoom(layout, cols, rows, k) {
+  const g = Array.from({ length: rows }, () => Array(cols).fill(false));
+  for (const [r, c] of Object.values(layout)) if (g[r] && c < cols) g[r][c] = true;
+  return g.some((line) => {
+    for (let s = 0; s + k <= cols; s++) {
+      let ok = (s === 0 || !line[s - 1]) && (s + k === cols || !line[s + k]);
+      for (let i = s; ok && i < s + k; i++) if (line[i]) ok = false;
+      if (ok) return true;
+    }
+    return false;
+  });
+}
 function tileRect(el, w) { return { ...stagePos(el), w }; }
 function avatarRect(p, w) {
   const av = $('#players').children[p]?.querySelector('.av');
@@ -1125,7 +1138,12 @@ function findDrop(pt, ids, grab) {
     const moving = new Set(ids);
     const onTile = row >= 0 && row < geo.rows && Object.entries(work.layout)
       .some(([id, [r, c]]) => !moving.has(Number(id)) && r === row && c === col);
-    if (onTile) return { type: 'board', spot: { row, start: Math.max(0, Math.round(at.colF)), insert: true }, at };
+    if (onTile) {
+      // 끼워 넣기는 넣은 타일이 맞는 조합에 들어갈 때만 (작은 타일 위를 지나가다 엉뚱하게 끼워져 판이 흐트러지지 않게)
+      const spot = { row, start: Math.max(0, Math.round(at.colF)), insert: true };
+      const sets = tableOf(dropTiles(work.layout, viewBoard(), ids, spot, lockedIds()).layout);
+      if (sets.some((set) => set.includes(ids[0]) && analyzeSet(set).valid)) return { type: 'board', spot, at };
+    }
     const spot = nearestFree(work.layout, viewBoard(), ids, at);
     return spot ? { type: 'board', spot, at } : null;
   }

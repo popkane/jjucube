@@ -4,6 +4,10 @@ import { analyzeSet, tileOf, sortRack } from './engine.js';
 
 export const DEFAULT_BOARD = { rows: 4, cols: 14 }; // 공식 앱처럼 처음엔 크게, 모자라면 늘리며 작아짐
 
+// 줄 수에 따라 넓혀도 되는 칸 수. 테이블 자리가 가로로 긴 모양(대략 가로:세로 = 2.6:1, 타일 세로/가로 1.36)이라
+// 이만큼까지는 판을 넓히는 게 줄을 하나 늘리는 것보다 타일이 크다. 넘치면 넓히지 않고 다른 줄로 보낸다
+export const colLimit = (rows) => Math.max(DEFAULT_BOARD.cols, Math.floor(3.5 * (rows + 1)));
+
 export function makeGrid(layout, board) {
   const g = Array.from({ length: board.rows }, () => Array(board.cols).fill(null));
   for (const [id, [r, c]] of Object.entries(layout)) if (g[r] && c < board.cols) g[r][c] = Number(id);
@@ -130,7 +134,7 @@ function partition(seq, locked) {
 }
 
 // 한 줄 정리: anchor 타일이 든 묶음을 조합끼리 나누고, 줄 전체에서 조합 사이 한 칸 간격을 맞춘다
-function settleRow(layout, board, row, anchor, locked) {
+function settleRow(layout, board, row, anchor, locked, dropped = []) {
   const segs = segments(layout).filter((x) => x.row === row);
   const blocks = [];
   for (const seg of segs) {
@@ -142,10 +146,42 @@ function settleRow(layout, board, row, anchor, locked) {
       }
     } else blocks.push({ ids: seg.ids, want: seg.start });
   }
-  const { pos, cols } = packRow(blocks, board.cols);
   for (const seg of segs) for (const id of seg.ids) delete layout[id];
+  // 줄이 많이 넘치면 판을 넓히지 않고(너무 넓히면 타일이 작아져 폰에서 조작이 힘듦) 다른 줄 빈 곳으로 옮긴다:
+  // 놓은 타일이 어디에도 안 붙고 따로 있으면 그것을, 붙었으면 놓은 곳에서 먼 조합부터
+  let rows = board.rows;
+  const need = () => blocks.reduce((sum, bl) => sum + bl.ids.length, 0) + blocks.length - 1;
+  while (need() > colLimit(rows)) {
+    const home = blocks.findIndex((bl) => bl.ids.includes(anchor));
+    let far = -1;
+    if (home >= 0 && blocks.length > 1 && blocks[home].ids.every((id) => dropped.includes(id))) far = home;
+    else blocks.forEach((bl, i) => { if (i !== home && (far < 0 || Math.abs(i - home) > Math.abs(far - home))) far = i; });
+    if (far < 0) break; // 놓은 조합 하나만으로도 넘치면 그때만 넓힌다
+    const [bl] = blocks.splice(far, 1);
+    let spot = freeSpotNear(layout, { ...board, rows }, bl.ids.length, row, bl.want);
+    while (!spot) { rows += 1; spot = freeSpotNear(layout, { ...board, rows }, bl.ids.length, row, bl.want); }
+    bl.ids.forEach((id, k) => { layout[id] = [spot.row, spot.start + k]; });
+  }
+  const { pos, cols } = packRow(blocks, board.cols);
   blocks.forEach((bl, i) => bl.ids.forEach((id, k) => { layout[id] = [row, pos[i] + k]; }));
-  return cols;
+  return { cols, rows };
+}
+
+// k장이 다른 조합과 안 붙게 들어갈 빈 곳 중 (row, col)에 가장 가까운 곳 (그 줄 자체는 빼고)
+function freeSpotNear(layout, board, k, row, col) {
+  const g = makeGrid(layout, board);
+  let best = null;
+  for (let r = 0; r < board.rows; r++) {
+    if (r === row) continue;
+    for (let s = 0; s + k <= board.cols; s++) {
+      let ok = (s === 0 || g[r][s - 1] === null) && (s + k === board.cols || g[r][s + k] === null);
+      for (let i = s; ok && i < s + k; i++) if (g[r][i] !== null) ok = false;
+      if (!ok) continue;
+      const d = Math.abs(r - row) * 3 + Math.abs(s - col);
+      if (!best || d < best.d) best = { row: r, start: s, d };
+    }
+  }
+  return best;
 }
 
 // 한 줄의 묶음들(want 순서)을 원하는 칸에 두되 서로 한 칸 이상 띄운다.
@@ -197,8 +233,8 @@ export function dropTiles(layout, board, ids, spot, locked = null) {
     for (const [id, [r, c]] of Object.entries(out)) if (r === spot.row && c >= spot.start) out[id] = [r, c + ids.length];
   }
   ids.forEach((id, i) => { out[id] = [spot.row, spot.start + i]; });
-  const cols = settleRow(out, board, spot.row, ids[0], locked);
-  return { layout: out, board: { rows: Math.max(board.rows, spot.row + 1), cols: Math.max(board.cols, cols) } };
+  const { cols, rows } = settleRow(out, { ...board, rows: Math.max(board.rows, spot.row + 1) }, spot.row, ids[0], locked, ids);
+  return { layout: out, board: { rows, cols: Math.max(board.cols, cols) } };
 }
 
 // 조합들을 그대로 유지한 채 위에서부터 빈칸 하나씩 띄워 촘촘히 다시 놓는다
@@ -277,15 +313,37 @@ export function arrangeTable(layout, board, table) {
     const blocks = segments(out).filter((x) => x.row === row).map((x) => ({ ids: x.ids, want: x.start }));
     blocks.push(...moved.filter((m) => m.row === row));
     blocks.sort((a, b) => a.want - b.want);
+    for (const bl of blocks) for (const id of bl.ids) delete out[id];
+    // 줄이 많이 넘치면 판을 넓히지 않고 맨 끝 조합부터 다른 줄 빈 곳으로
+    while (blocks.length > 1 && blocks.reduce((sum, bl) => sum + bl.ids.length + 1, -1) > colLimit(bd.rows)) {
+      const bl = blocks.pop();
+      let spot = freeSpotNear(out, bd, bl.ids.length, row, bl.want);
+      while (!spot) { bd = { ...bd, rows: bd.rows + 1 }; spot = freeSpotNear(out, bd, bl.ids.length, row, bl.want); }
+      bl.ids.forEach((id, k) => { out[id] = [spot.row, spot.start + k]; });
+    }
     const { pos, cols } = packRow(blocks, bd.cols);
     blocks.forEach((bl, i) => bl.ids.forEach((id, k) => { out[id] = [row, pos[i] + k]; }));
     bd = { ...bd, cols: Math.max(bd.cols, cols) };
   }
   for (const ids of fresh) {
     let spot = freeSpot(out, bd, ids.length);
+    // 빈 곳이 없으면 줄을 늘리기 전에(타일이 작아짐) 한 줄씩 조합을 왼쪽으로 모아 자리를 만들어 본다
+    for (let r = 0; !spot && r < bd.rows; r++) {
+      const trial = { ...out };
+      let c = 0;
+      for (const seg of segments(out).filter((x) => x.row === r)) {
+        seg.ids.forEach((id, i) => { trial[id] = [r, c + i]; });
+        c += seg.ids.length + 1;
+      }
+      const s2 = freeSpot(trial, bd, ids.length);
+      if (s2) { Object.assign(out, trial); spot = s2; }
+    }
+    // 그래도 없으면 넓혀도 되는 만큼 넓혀 보고, 마지막에 줄을 늘린다
     while (!spot) {
-      bd = { ...bd, rows: bd.rows + 1 };
-      spot = freeSpot(out, bd, ids.length);
+      const wide = { ...bd, cols: colLimit(bd.rows) };
+      spot = wide.cols > bd.cols ? freeSpot(out, wide, ids.length) : null;
+      bd = spot ? wide : { ...bd, rows: bd.rows + 1 };
+      spot = spot || freeSpot(out, bd, ids.length);
     }
     ids.forEach((id, i) => { out[id] = [spot.row, spot.start + i]; });
   }
