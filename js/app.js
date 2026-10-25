@@ -54,6 +54,9 @@ let workTurn = null;        // work가 몇 번째 차례 것인지
 let turnStart = null;       // 차례 시작 때의 work (되돌리기 = 여기로 전부 되돌림)
 let moves = 0;              // 이번 차례에 옮긴 횟수
 let startTableIds = new Set();
+let tableFor = null;        // 테이블을 그리던 판 (같은 판일 때만 날아가는 연출)
+const leftBoard = new Map(); // 방금 테이블에서 빠져 받침대로 돌아오는 타일 → 출발 위치
+let lastDrawKey = null;     // 상대가 받은 타일 연출을 이미 한 차례
 let lastAdded = new Set();  // 상대가 방금 차례에 새로 낸 타일 (주황 테두리)
 let badIds = new Set();     // ✓를 눌렀는데 틀린 조합 (잠깐 빨갛게)
 let selected = new Set();
@@ -382,6 +385,14 @@ function applyState(s, newRev = rev + 1, draw = true) {
   lastAdded = game.last && game.last.action === 'play' && game.last.player !== me() && prevGid === game.gid
     ? new Set(game.table.flat().filter((id) => !prevIds.has(id))) : new Set();
   if (game.last && game.last.player !== me() && prevGid === game.gid && game.status === 'playing') toast(describeLast());
+  // 상대가 타일을 받았으면(1장 받기·벌칙) 더미에서 그 캐릭터 쪽으로 뒷면 타일이 날아감 — 같은 차례는 한 번만
+  const drawKey = `${game.gid}:${game.turn}`;
+  if (game.last && prevGid === game.gid && game.last.player !== me() && ['draw', 'penalty'].includes(game.last.action) && drawKey !== lastDrawKey) {
+    lastDrawKey = drawKey;
+    const p = game.last.player;
+    const k = game.last.count || 1;
+    for (let i = 0; i < k; i++) setTimeout(() => flyToPlayer(p), 120 + i * 140);
+  }
   busy = false;
   badIds = new Set();
   if (live && live.turn !== game.turn) live = null;
@@ -739,7 +750,9 @@ function renderTable() {
   const W = box.clientWidth - 12;
   const H = box.clientHeight - 12;
   const cols = Math.max(board.cols, usedCols(layout));
-  const needRows = Math.max(board.rows, usedRows(layout));
+  let needRows = Math.max(board.rows, usedRows(layout));
+  // 줄마다 타일이 있으면 새 조합을 놓을 빈 줄을 하나 더 (공식 앱도 테이블이 차면 판이 늘며 타일이 작아짐)
+  if (new Set(Object.values(layout).map(([r]) => r)).size >= needRows) needRows += 1;
   const w = Math.max(16, Math.min(52, W / cols, H / (needRows * RATIO)));
   const h = w * RATIO;
   const rows = Math.max(needRows, Math.floor(H / h));
@@ -748,15 +761,85 @@ function renderTable() {
   boardEl.style.setProperty('--tw', `${w - 2}px`);
   boardEl.style.setProperty('--cw', `${w}px`);
   boardEl.style.setProperty('--ch', `${h}px`);
+  // 상대가 움직인 것(되돌리기·재배치)은 조금 천천히 미끄러져서 눈으로 따라갈 수 있게
+  boardEl.classList.toggle('slow', !(isMyTurn() && work));
+  // 같은 판을 계속 보고 있을 때만 날아가는 연출 (처음 그리거나 다시 접속하면 그냥 놓기)
+  const animate = tableFor === game.gid && !document.hidden;
+  tableFor = game.gid;
   const keep = new Set();
+  const from = live ? live.player : game.last?.player;
+  let n = 0;
   for (const [key, [r, c]] of Object.entries(layout)) {
     const id = Number(key);
-    placeTile(boardTiles, boardEl, id, c * w + 1, r * h + 1);
+    const fresh = !boardTiles.has(id) && !spawnAt.has(id);
+    const el = placeTile(boardTiles, boardEl, id, c * w + 1, r * h + 1);
     keep.add(id);
+    if (!animate || !fresh) continue;
+    // 상대 손에서 나온 타일: 그 사람 캐릭터에서 날아와 칸에 내려앉음 (공식 앱처럼)
+    const start = rackTiles.has(id) && rackGeo ? tileRect(rackTiles.get(id), rackGeo.w)
+      : from !== undefined && from !== me() && from >= 0 ? avatarRect(from, w * 0.5) : null;
+    if (!start) continue;
+    el.classList.remove('appear');
+    el.classList.add('incoming');
+    const delay = n++ * 70;
+    setTimeout(() => flyBetween(tileEl(id), start, tileRect(el, w - 2)).then(() => el.classList.remove('incoming')), delay);
   }
-  prune(boardTiles, keep);
+  for (const [id, el] of boardTiles) {
+    if (keep.has(id)) continue;
+    // 테이블에서 빠진 타일: 내 받침대로 돌아오면 받침대가 이어받아 날리고, 상대 손으로 돌아가면 그 캐릭터 쪽으로 날아감
+    if (animate) {
+      const rect = tileRect(el, w - 2);
+      if (rackIds().includes(id)) leftBoard.set(id, rect);
+      else {
+        const owner = game.racks.findIndex((rk, p) => p !== me() && rk.includes(id));
+        if (owner >= 0) flyBetween(tileEl(id), rect, { ...avatarRect(owner, w * 0.45), fade: true });
+      }
+    }
+    el.remove();
+    boardTiles.delete(id);
+  }
   geo = { w, h, rows, cols, el: boardEl };
   syncTileClasses();
+}
+
+// ---------- 칸 사이를 오가는 타일 (테이블 ↔ 받침대 ↔ 캐릭터 ↔ 더미): 틀 위에 그림자 타일을 띄워 날린다 ----------
+function tileRect(el, w) { return { ...stagePos(el), w }; }
+function avatarRect(p, w) {
+  const av = $('#players').children[p]?.querySelector('.av');
+  if (!av) return null;
+  const pos = stagePos(av);
+  return { x: pos.x + av.offsetWidth / 2 - w / 2, y: pos.y + av.offsetHeight / 2 - (w * RATIO) / 2, w };
+}
+function pileRect(w) {
+  const b = $('#mainBtn');
+  const pos = stagePos(b);
+  return { x: pos.x + b.offsetWidth / 2 - w / 2, y: pos.y + b.offsetHeight / 2 - (w * RATIO) / 2, w };
+}
+function flyBetween(ghost, from, to, ms = 560) {
+  return new Promise((resolve) => {
+    if (typeof from?.x !== 'number' || typeof to?.x !== 'number') { resolve(); return; }
+    ghost.classList.add('flying');
+    ghost.style.setProperty('--tw', `${to.w}px`);
+    ghost.style.transformOrigin = '0 0';
+    $('#stage').append(ghost);
+    const s0 = from.w / to.w;
+    const anim = ghost.animate([
+      { transform: `translate(${from.x}px, ${from.y}px) scale(${s0})`, opacity: from.fade ? 0 : 1 },
+      { transform: `translate(${(from.x + to.x) / 2}px, ${Math.min(from.y, to.y) - 36}px) scale(${((s0 + 1) / 2) * 1.08})`, opacity: 1, offset: 0.5 },
+      { transform: `translate(${to.x}px, ${to.y}px) scale(1)`, opacity: to.fade ? 0 : 1 },
+    ], { duration: ms, easing: 'cubic-bezier(.3,.7,.4,1)' });
+    let done = false;
+    const finish = () => { if (done) return; done = true; ghost.remove(); resolve(); };
+    anim.onfinish = finish;
+    setTimeout(finish, ms + 400);
+  });
+}
+// 뒷면 타일이 더미(+)에서 상대 캐릭터로 (상대가 받거나, 판 시작 때 나눠줄 때)
+function flyToPlayer(p, quick = false) {
+  const w = rackGeo ? rackGeo.w * 0.7 : 30;
+  const ghost = document.createElement('div');
+  ghost.className = 'tile back';
+  flyBetween(ghost, pileRect(w), { ...avatarRect(p, w * 0.6), fade: true }, quick ? 420 : 600);
 }
 
 // 받침대 배치를 지금 판·내 자리 것으로 맞춘다 (판이 바뀌면 새로, 받은/낸 타일 반영)
@@ -808,12 +891,21 @@ function renderRack() {
   const keep = new Set();
   for (const [key, [r, c]] of Object.entries(rackPos)) {
     const id = Number(key);
+    const back = !rackTiles.has(id) && !spawnAt.has(id) ? leftBoard.get(id) : null;
+    leftBoard.delete(id);
     const el = placeTile(rackTiles, rackGridEl, id, x(c), y(r));
-    el.classList.toggle('incoming', flying.has(id));
+    if (back) {
+      // 테이블에서 돌아온 타일(되돌리기·시간 초과): 테이블 자리에서 받침대 칸으로 날아옴
+      el.classList.remove('appear');
+      el.dataset.homing = '1';
+      flyBetween(tileEl(id), back, tileRect(el, w)).then(() => { delete el.dataset.homing; el.classList.remove('incoming'); });
+    }
+    el.classList.toggle('incoming', flying.has(id) || el.dataset.homing === '1');
     el.classList.toggle('drawn', drawn.has(id));
     keep.add(id);
   }
   prune(rackTiles, keep);
+  leftBoard.clear();
   box.classList.toggle('waiting', !isMyTurn());
   rackGeo = { el: rackGridEl, w, h, gap: RACK_GAP, cols };
   syncTileClasses();
@@ -834,6 +926,11 @@ function flyNewTiles(ids) {
     if (!deal) return;
     dealt.add(game.gid);
     ids.forEach((id, i) => { flying.add(id); setTimeout(() => flyOne(id, true), 500 + i * 55); });
+    // 상대들에게도 14장씩 (뒷면이 캐릭터 쪽으로)
+    names.forEach((_, p) => {
+      if (p === me()) return;
+      for (let i = 0; i < 14; i++) setTimeout(() => flyToPlayer(p, true), 520 + i * 55 + p * 18);
+    });
     syncDealHidden();
     return;
   }

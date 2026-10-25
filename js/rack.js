@@ -16,16 +16,26 @@ export function rackCols(pos) {
   return Math.max(BASE_COLS, maxCol + 2, Math.ceil(n / RACK_ROWS) + 2);
 }
 
-// 받침대에 실제로 있는 타일(ids)과 맞추기: 없어진 타일은 빼고, 새로 받은 타일은 덜 찬 줄 끝에 넣는다
-// (처음 14장은 7장씩 두 줄 → 양쪽 줄 다 빈칸이 남아서 아무 데나 옮기기 쉬움)
+// 받침대에 실제로 있는 타일(ids)과 맞추기: 없어진 타일은 빼고, 새로 받은 타일은
+// 읽는 순서(윗줄 왼→오, 그다음 아랫줄)로 첫 빈칸에 넣는다 (공식 앱 3인용 캡처: 1 8 4 2 6 _ 에 받은 3은 6 바로 뒤)
+// 처음 14장(빈 받침대)만 7장씩 두 줄 → 양쪽 줄 다 빈칸이 남아서 아무 데나 옮기기 쉬움
 export function syncRack(pos, ids) {
   const have = new Set(ids);
   const out = {};
   for (const [id, p] of Object.entries(pos)) if (have.has(Number(id))) out[id] = p;
+  const deal = Object.keys(out).length === 0;
   for (const id of ids) {
     if (out[id]) continue;
-    const r = rowOf(out, 1).length < rowOf(out, 0).length ? 1 : 0;
-    out[id] = [r, lastCol(out, r) + 1];
+    if (deal) {
+      const r = rowOf(out, 1).length < rowOf(out, 0).length ? 1 : 0;
+      out[id] = [r, lastCol(out, r) + 1];
+      continue;
+    }
+    const used = new Set(Object.values(out).map(([r, c]) => r + ':' + c));
+    const cols = rackCols(out);
+    let spot = null;
+    for (let r = 0; r < RACK_ROWS && !spot; r++) for (let c = 0; c < cols && !spot; c++) if (!used.has(r + ':' + c)) spot = [r, c];
+    out[id] = spot || [0, lastCol(out, 0) + 1];
   }
   return out;
 }

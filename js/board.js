@@ -2,7 +2,7 @@
 // layout = { [타일id]: [줄, 칸] }, board = { rows, cols }. 화면과 무관한 순수 함수만 둔다.
 import { analyzeSet, tileOf, sortRack } from './engine.js';
 
-export const DEFAULT_BOARD = { rows: 5, cols: 16 };
+export const DEFAULT_BOARD = { rows: 4, cols: 14 }; // 공식 앱처럼 처음엔 크게, 모자라면 늘리며 작아짐
 
 export function makeGrid(layout, board) {
   const g = Array.from({ length: board.rows }, () => Array(board.cols).fill(null));
@@ -142,7 +142,15 @@ function settleRow(layout, board, row, anchor, locked) {
       }
     } else blocks.push({ ids: seg.ids, want: seg.start });
   }
-  let cols = board.cols;
+  const { pos, cols } = packRow(blocks, board.cols);
+  for (const seg of segs) for (const id of seg.ids) delete layout[id];
+  blocks.forEach((bl, i) => bl.ids.forEach((id, k) => { layout[id] = [row, pos[i] + k]; }));
+  return cols;
+}
+
+// 한 줄의 묶음들(want 순서)을 원하는 칸에 두되 서로 한 칸 이상 띄운다.
+// 오른쪽 끝을 넘으면 오른쪽부터 왼쪽으로 밀고, 그래도 모자라면 판을 넓힌다. 돌려주는 값: { pos, cols }
+function packRow(blocks, cols) {
   const pos = [];
   const leftPass = (useWant) => {
     blocks.forEach((bl, i) => {
@@ -161,9 +169,7 @@ function settleRow(layout, board, row, anchor, locked) {
       leftPass(false);
     }
   }
-  for (const seg of segs) for (const id of seg.ids) delete layout[id];
-  blocks.forEach((bl, i) => bl.ids.forEach((id, k) => { layout[id] = [row, pos[i] + k]; }));
-  return cols;
+  return { pos, cols };
 }
 
 // ids를 spot(={row,start})에 놓고 그 줄을 정리한다. 돌려주는 값: { layout, board }
@@ -201,44 +207,66 @@ export function layoutFromTable(table, board = DEFAULT_BOARD) {
   return tidy(flat, { ...board, rows: Math.max(board.rows, table.length) });
 }
 
-// 빈 곳 찾기: 양옆이 비어 있어서 다른 조합과 붙지 않는 자리 (위에서부터)
+// 빈 곳 찾기: 양옆이 비어 있어서 다른 조합과 붙지 않는 자리 중 판 가운데에 가장 가까운 곳
+// (공식 앱 3인용 캡처: 새로 낸 조합은 가운데부터 채워지고, 위·아래 줄로 퍼진다)
 function freeSpot(layout, board, k) {
   const g = makeGrid(layout, board);
+  const rc = (board.rows - 1) / 2, cc = (board.cols - k) / 2;
+  let best = null;
   for (let r = 0; r < board.rows; r++) {
     for (let s = 0; s + k <= board.cols; s++) {
       let ok = (s === 0 || g[r][s - 1] === null) && (s + k === board.cols || g[r][s + k] === null);
       for (let i = s; ok && i < s + k; i++) if (g[r][i] !== null) ok = false;
-      if (ok) return { row: r, start: s };
+      if (!ok) continue;
+      const d = Math.abs(r - rc) * 2 + Math.abs(s - cc);
+      if (!best || d < best.d) best = { row: r, start: s, d };
     }
   }
-  return null;
+  return best;
 }
 
-// 조합 목록(컴퓨터가 낸 결과)을 바닥에 놓는다: 그대로인 조합은 제자리, 바뀌었거나 새로 생긴 조합은 빈 곳에.
-// 빈 곳이 없으면 정돈해 보고, 그래도 없으면 줄을 늘린다.
+// 조합 목록(컴퓨터가 낸 결과)을 바닥에 놓는다. 공식 앱처럼 테이블을 통째로 다시 깔지 않는다:
+//  - 그대로인 조합은 제자리
+//  - 바뀐 조합(옛 조합에 타일을 붙이거나 나눈 것)은 타일이 가장 많이 있던 옛 조합 자리에 두고, 그 줄만 한 칸 간격으로 맞춘다
+//  - 받침대에서 새로 낸 조합은 가운데에 가까운 빈 곳. 없으면 줄을 늘린다(타일이 작아짐)
 export function arrangeTable(layout, board, table) {
   // 같은 타일들로 된 조합이면(순서가 달라도) 제자리에 그대로 둔다
   const key = (ids) => [...ids].sort((x, y) => x - y).join(',');
-  const keep = new Map(segments(layout).map((s) => [key(s.ids), s]));
-  let out = {};
-  const pending = [];
+  const segs = segments(layout);
+  const keep = new Map(segs.map((s) => [key(s.ids), s]));
+  const segOf = new Map();
+  for (const s of segs) for (const id of s.ids) segOf.set(id, s);
+  const out = {};
+  const moved = [];
+  const fresh = [];
   for (const set of table) {
     const ids = setOrder(set) || set;
     const s = keep.get(key(ids));
     if (s) {
       s.ids.forEach((id, i) => { out[id] = [s.row, s.start + i]; });
       keep.delete(key(ids));
-    } else pending.push(ids);
-  }
-  let bd = { ...board, cols: Math.max(board.cols, ...pending.map((p) => p.length)) };
-  let tidied = false;
-  for (const ids of pending) {
-    let spot = freeSpot(out, bd, ids.length);
-    if (!spot && !tidied) {
-      ({ layout: out, board: bd } = tidy(out, bd));
-      tidied = true;
-      spot = freeSpot(out, bd, ids.length);
+      continue;
     }
+    const count = new Map();
+    for (const id of ids) { const o = segOf.get(id); if (o) count.set(o, (count.get(o) || 0) + 1); }
+    let home = null;
+    for (const [o, n] of count) if (!home || n > count.get(home)) home = o;
+    if (!home) { fresh.push(ids); continue; }
+    // 옛 조합 안에서 내 타일이 처음 나오는 위치 → 나뉜 조합(4 5 6 7 | 7 8 9)도 원래 순서대로
+    const first = Math.min(...ids.map((id) => home.ids.indexOf(id)).filter((i) => i >= 0));
+    moved.push({ ids, row: home.row, want: home.start + first });
+  }
+  let bd = { ...board, cols: Math.max(board.cols, ...table.map((t) => t.length)) };
+  for (const row of new Set(moved.map((m) => m.row))) {
+    const blocks = segments(out).filter((x) => x.row === row).map((x) => ({ ids: x.ids, want: x.start }));
+    blocks.push(...moved.filter((m) => m.row === row));
+    blocks.sort((a, b) => a.want - b.want);
+    const { pos, cols } = packRow(blocks, bd.cols);
+    blocks.forEach((bl, i) => bl.ids.forEach((id, k) => { out[id] = [row, pos[i] + k]; }));
+    bd = { ...bd, cols: Math.max(bd.cols, cols) };
+  }
+  for (const ids of fresh) {
+    let spot = freeSpot(out, bd, ids.length);
     while (!spot) {
       bd = { ...bd, rows: bd.rows + 1 };
       spot = freeSpot(out, bd, ids.length);
