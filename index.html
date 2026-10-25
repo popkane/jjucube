@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
-<link rel="stylesheet" href="css/style.css?v=11">
+<link rel="stylesheet" href="css/style.css?v=202610251930">
 </head>
 <body>
 
@@ -212,6 +212,32 @@
 
 <div id="toast" class="toast" hidden></div>
 
-<script type="module" src="js/app.js?v=11"></script>
+<!-- 모든 모듈을 같은 버전으로 받게 하는 목록 (node bump.mjs 가 다시 만듦) -->
+<script type="importmap">
+{
+  "imports": {
+    "./js/ai.js": "./js/ai.js?v=202610251930",
+    "./js/app.js": "./js/app.js?v=202610251930",
+    "./js/board.js": "./js/board.js?v=202610251930",
+    "./js/characters.js": "./js/characters.js?v=202610251930",
+    "./js/engine.js": "./js/engine.js?v=202610251930",
+    "./js/firebase-config.js": "./js/firebase-config.js?v=202610251930",
+    "./js/net.js": "./js/net.js?v=202610251930",
+    "./js/sound.js": "./js/sound.js?v=202610251930"
+  }
+}
+</script>
+<!-- 불러오기가 실패하거나 너무 오래 걸리면 화면에 알려준다 -->
+<script>
+  window.addEventListener('error', function () {
+    var el = document.getElementById('connState');
+    if (el) el.textContent = '불러오기 오류가 났어요. 화면을 아래로 당겨 새로고침해 주세요';
+  });
+  setTimeout(function () {
+    var el = document.getElementById('connState');
+    if (el && el.textContent === '연결 중…') el.textContent = '연결이 오래 걸려요. 새로고침해 보시고, 카톡 안에서 열었다면 크롬·사파리로 열어 주세요';
+  }, 10000);
+</script>
+<script type="module" src="js/app.js?v=202610251930"></script>
 </body>
 </html>
