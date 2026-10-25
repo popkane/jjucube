@@ -103,7 +103,9 @@ function fitStage() {
 
 // ---------- 전체화면 ----------
 // 안드로이드 크롬: 주소창·상태바를 숨기고 가로로 고정. 아이폰은 웹 전체화면을 막아서 '홈 화면에 추가'로 열어야 한다.
-const isStandalone = () => matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone === true;
+// 홈 화면에 추가한 앱으로 열었는지 (버튼으로 켠 전체화면도 display-mode: fullscreen 으로 잡히므로 그 경우는 빼야 함)
+const isStandalone = () => navigator.standalone === true || matchMedia('(display-mode: standalone)').matches
+  || (matchMedia('(display-mode: fullscreen)').matches && !document.fullscreenElement);
 function goFullscreen(quiet = false) {
   if (isStandalone() || document.fullscreenElement) return;
   if (!document.documentElement.requestFullscreen) {
@@ -121,7 +123,7 @@ function toggleFullscreen() {
 }
 function syncFullBtns() {
   const full = !!document.fullscreenElement;
-  for (const id of ['#fullBtn', '#gameFullBtn']) {
+  for (const id of ['#fullBtn', '#lobbyFullBtn', '#gameFullBtn']) {
     const b = $(id);
     if (!b) continue;
     b.hidden = isStandalone();
@@ -157,6 +159,7 @@ fitStage();
 addEventListener('resize', () => { fitStage(); if (!press && game && !$('#game').hidden) render(); });
 $('#fullBtn').addEventListener('click', toggleFullscreen);
 $('#gameFullBtn').addEventListener('click', toggleFullscreen);
+$('#lobbyFullBtn').addEventListener('click', toggleFullscreen);
 // 폰에서 게임을 시작하는 버튼을 누르면 자동으로 전체화면을 시도한다
 document.addEventListener('click', (e) => {
   if (isTouch && e.target.closest('#resumeBtn, #resumeCpuBtn, #startBtn, #againBtn, #createForm [type=submit], #joinForm [type=submit], #cpuForm [type=submit]')) goFullscreen(true);
