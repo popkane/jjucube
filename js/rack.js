@@ -8,23 +8,23 @@ export const BASE_COLS = 10;
 const rowOf = (pos, r) => Object.entries(pos).filter(([, [rr]]) => rr === r).map(([id, [, c]]) => [Number(id), c]).sort((a, b) => a[1] - b[1]);
 const lastCol = (pos, r) => rowOf(pos, r).reduce((m, [, c]) => Math.max(m, c), -1);
 
-// 칸 수: 기본 10칸, 타일이 많거나 오른쪽 끝까지 놓였으면 늘린다 (그만큼 타일이 작아짐)
+// 칸 수: 기본 10칸. 줄마다 빈칸이 2칸 이상 남도록 늘린다 (그만큼 타일이 작아짐)
 export function rackCols(pos) {
   const n = Object.keys(pos).length;
   let maxCol = -1;
   for (const [, c] of Object.values(pos)) maxCol = Math.max(maxCol, c);
-  return Math.max(BASE_COLS, maxCol + 2, Math.ceil(n / RACK_ROWS) + 1);
+  return Math.max(BASE_COLS, maxCol + 2, Math.ceil(n / RACK_ROWS) + 2);
 }
 
-// 받침대에 실제로 있는 타일(ids)과 맞추기: 없어진 타일은 빼고, 새로 받은 타일은 윗줄 끝 → 아랫줄 끝에 넣는다
+// 받침대에 실제로 있는 타일(ids)과 맞추기: 없어진 타일은 빼고, 새로 받은 타일은 덜 찬 줄 끝에 넣는다
+// (처음 14장은 7장씩 두 줄 → 양쪽 줄 다 빈칸이 남아서 아무 데나 옮기기 쉬움)
 export function syncRack(pos, ids) {
   const have = new Set(ids);
   const out = {};
   for (const [id, p] of Object.entries(pos)) if (have.has(Number(id))) out[id] = p;
-  const cols = Math.max(BASE_COLS, Math.ceil(ids.length / RACK_ROWS)); // 윗줄이 '찼다'고 보는 칸 수
   for (const id of ids) {
     if (out[id]) continue;
-    const r = lastCol(out, 0) + 1 < cols ? 0 : 1;
+    const r = rowOf(out, 1).length < rowOf(out, 0).length ? 1 : 0;
     out[id] = [r, lastCol(out, r) + 1];
   }
   return out;
@@ -53,7 +53,7 @@ export function insertIntoRack(pos, ids, row, col) {
 // 한 번만 정렬: 숫자순/색깔순으로 윗줄부터 채운다
 export function arrangeRack(ids, by) {
   const sorted = sortRack(ids, by);
-  const cols = Math.max(BASE_COLS, Math.ceil(sorted.length / RACK_ROWS));
+  const cols = Math.ceil(sorted.length / RACK_ROWS); // 두 줄에 반반
   const out = {};
   sorted.forEach((id, i) => { out[id] = [Math.floor(i / cols), i % cols]; });
   return out;
