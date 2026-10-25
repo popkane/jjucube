@@ -172,11 +172,27 @@ function packRow(blocks, cols) {
   return { pos, cols };
 }
 
+// 테이블 조합에서 타일을 빼 갔을 때, 남은 타일끼리 맞는 조합이면 빈칸을 메워 붙인다 (왼쪽은 그대로, 오른쪽이 당겨짐)
+// 예: 5 5 5 5 에서 가운데 하나 → 5 5 5, 3 4 5 6 7 에서 가운데 5 → 3 4 _ 6 7 은 안 맞으니 그대로
+// 빼 간 타일을 원래 조합 자리 안에 다시 놓는 중이면 건드리지 않는다
+function closeGaps(out, before, ids, spot) {
+  const moving = new Set(ids);
+  for (const seg of segments(before)) {
+    if (!seg.ids.some((id) => moving.has(id))) continue;
+    const end = seg.start + seg.ids.length - 1;
+    if (spot.row === seg.row && spot.start >= seg.start && spot.start <= end) continue;
+    const rest = seg.ids.filter((id) => !moving.has(id));
+    if (rest.length < 3 || !analyzeSet(rest).valid) continue;
+    rest.forEach((id, i) => { out[id] = [seg.row, seg.start + i]; });
+  }
+}
+
 // ids를 spot(={row,start})에 놓고 그 줄을 정리한다. 돌려주는 값: { layout, board }
 // spot.insert 이면 끼워 넣기: 그 줄에서 spot.start 칸부터 오른쪽 타일을 k칸 밀고 그 자리에 넣는다
 // (예: 4 5 6 7 8 9 의 6과 7 사이에 7 → 4 5 6 7 | 7 8 9 로 나뉘며 7 8 9가 밀림)
 export function dropTiles(layout, board, ids, spot, locked = null) {
   const out = without(layout, ids);
+  closeGaps(out, layout, ids, spot);
   if (spot.insert) {
     for (const [id, [r, c]] of Object.entries(out)) if (r === spot.row && c >= spot.start) out[id] = [r, c + ids.length];
   }
