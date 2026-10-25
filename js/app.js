@@ -607,9 +607,9 @@ function renderTable() {
   const { layout, board } = src;
   const W = box.clientWidth - 16;
   const H = box.clientHeight - 16;
-  const needRows = Math.max(board.rows, usedRows(layout));
-  // 타일은 크게(최대 46). 줄이 많아져도 줄이지 않고 테이블을 위아래로 밀어서 본다. 칸이 많을 때만 폭에 맞춰 작아짐
-  const w = Math.max(18, Math.min(46, W / board.cols));
+  // 화면에 딱 맞게(스크롤 없음): 타일은 최대 46으로 크게, 타일이 놓인 줄이 화면에 다 안 들어갈 때만 작아진다
+  const needRows = Math.max(1, usedRows(layout));
+  const w = Math.max(16, Math.min(46, W / board.cols, H / (needRows * RATIO)));
   const h = w * RATIO;
   const rows = Math.max(needRows, Math.floor(H / h));
   const el = document.createElement('div');
