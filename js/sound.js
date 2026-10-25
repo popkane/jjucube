@@ -89,3 +89,13 @@ export function playTurnBell() {
   bell(t, 659.25, 0.16);        // 띵 (미)
   bell(t + 0.28, 523.25, 0.14); // 동 (도)
 }
+
+// 초시계 '똑딱' — 남은 시간 5초부터 1초마다. 마지막 1~2초는 조금 높고 크게(급한 느낌)
+export function playClockTick(secLeft) {
+  if (!enabled || !ctx || ctx.state !== 'running') return;
+  const t = ctx.currentTime + 0.005;
+  const urgent = secLeft <= 2;
+  const hi = secLeft % 2 === 1; // 똑·딱 번갈아
+  click(t, (hi ? 3400 : 2600) * (urgent ? 1.2 : 1), urgent ? 0.6 : 0.45, 0.025);
+  thud(t, hi ? 900 : 760, urgent ? 0.12 : 0.08, 0.04);
+}

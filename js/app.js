@@ -9,7 +9,7 @@ import { DEFAULT_BOARD, segments, tableOf, nearestFree, dropTiles, blockOrder, a
 import { syncRack, arrangeRack, rackCols, nearestFreeSlot, placeInRack, insertIntoRack, RACK_ROWS } from './rack.js';
 import { aiMove, LEVELS } from './ai.js';
 import { CHARACTERS, pickCharacters, avatarHtml } from './characters.js';
-import { playTile, playTurnBell, unlockAudio, setSoundEnabled } from './sound.js';
+import { playTile, playTurnBell, playClockTick, unlockAudio, setSoundEnabled } from './sound.js';
 import {
   signIn, serverNow, seatList, createRoom, joinRoom, leaveLobby, armLobbyCleanup, canResume, markOnline, watchRoom, startRoom, commitSync, setLive,
 } from './net.js';
@@ -54,6 +54,7 @@ let workTurn = null;        // work가 몇 번째 차례 것인지
 let turnStart = null;       // 차례 시작 때의 work (되돌리기 = 여기로 전부 되돌림)
 let moves = 0;              // 이번 차례에 옮긴 횟수
 let startTableIds = new Set();
+let tickKey = null;         // 초시계 소리를 낸 초 (rev:초)
 let tableFor = null;        // 테이블을 그리던 판 (같은 판일 때만 날아가는 연출)
 const leftBoard = new Map(); // 방금 테이블에서 빠져 받침대로 돌아오는 타일 → 출발 위치
 let lastDrawKey = null;     // 상대가 받은 타일 연출을 이미 한 차례
@@ -583,6 +584,12 @@ function tick() {
     fg.style.strokeDashoffset = `${RING_LEN * (1 - shown / total)}`;
     card.classList.toggle('hurry', shown <= 10000);
     card.querySelector('.secs').textContent = Math.ceil(shown / 1000);
+  }
+  // 내 차례 남은 5초부터 1초마다 초시계 소리 (같은 초는 한 번만)
+  const sec = Math.ceil(shown / 1000);
+  if (isMyTurn() && left > 0 && sec <= 5 && tickKey !== `${rev}:${sec}`) {
+    tickKey = `${rev}:${sec}`;
+    playClockTick(sec);
   }
   if (firedRev === rev || busy) return;
   if (isMyTurn() && left <= 0) { firedRev = rev; timeUp(); }
