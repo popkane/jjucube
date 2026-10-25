@@ -162,7 +162,7 @@ body.framed #stage { border-radius: 26px; box-shadow: 0 0 0 5px var(--ink), 0 14
 .seats li.filled::before { content: "🐚 "; }
 
 /* ---------- 게임 화면: 왼쪽 캐릭터 | 가운데 테이블·받침대 | 오른쪽 버튼 ---------- */
-#game { display: grid; grid-template-columns: 76px 1fr 96px; background: var(--sand); }
+#game { display: grid; grid-template-columns: 72px 1fr 88px; background: var(--sand); }
 
 /* 왼쪽: 상대는 위, 나는 맨 아래 */
 .side-left {
@@ -231,22 +231,28 @@ body.framed #stage { border-radius: 26px; box-shadow: 0 0 0 5px var(--ink), 0 14
 .timer-bar.warn { background: var(--coral); }
 .timer-text { position: absolute; right: 8px; top: 0; font-size: 10px; line-height: 9px; color: var(--ink); }
 
-/* 받침대 = 나무 데크 2줄 (타일은 놓은 자리 그대로) */
-.rack {
-  position: relative; height: 132px; margin: 2px 8px 8px; padding: 10px 12px; flex: none;
-  background: repeating-linear-gradient(90deg, var(--wood) 0 46px, var(--wood-dark) 46px 49px);
-  border: 3px solid var(--ink); border-radius: 16px; box-shadow: 0 4px 0 var(--ink);
-}
+/* 받침대 = 원목 받침대 2층 (뒤판 윗단에 1층, 앞판 아랫단에 2층. 타일은 놓은 자리 그대로) */
+.rack { position: relative; height: 150px; margin: 0 22px 2px; padding: 6px 12px 16px; flex: none; }
 .rack-grid { position: relative; margin: 0 auto; }
-.rack-grid .tile { position: absolute; }
-.rack-set { position: absolute; border-radius: 10px; background: rgba(47, 191, 113, 0.35); box-shadow: 0 0 0 3px var(--good); }
+.rack-grid .tile { position: absolute; z-index: 2; }
+.rack-back {
+  position: absolute; left: -14px; right: -14px; z-index: 0; pointer-events: none;
+  background: linear-gradient(#c99460, #a56c3a); border: 3px solid var(--ink); border-radius: 12px 12px 6px 6px;
+}
+.rack-front {
+  position: absolute; left: -20px; right: -20px; z-index: 3; pointer-events: none;
+  display: flex; align-items: center; justify-content: flex-end; padding-right: 16px;
+  background: linear-gradient(#f3cf9f, #d9a26a); border: 3px solid var(--ink); border-radius: 10px; box-shadow: 0 4px 0 var(--ink);
+}
+.rack-front span { font-size: 15px; color: rgba(125, 72, 30, 0.45); text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5); }
+.rack-set { position: absolute; z-index: 1; border-radius: 10px; background: rgba(47, 191, 113, 0.45); box-shadow: 0 0 0 3px var(--good); }
 .rack-play {
-  position: absolute; z-index: 2; transform: translate(-50%, -70%); white-space: nowrap; cursor: pointer;
+  position: absolute; z-index: 4; transform: translate(-50%, -70%); white-space: nowrap; cursor: pointer;
   font-size: 12px; line-height: 1; padding: 4px 9px; border: 2px solid var(--ink); border-radius: 999px;
   background: var(--good); color: #fff; box-shadow: 0 2px 0 var(--ink);
 }
 .rack-play:active { transform: translate(-50%, -60%); box-shadow: 0 1px 0 var(--ink); }
-.rack.over { box-shadow: 0 0 0 4px var(--sun), 0 4px 0 var(--ink); }
+.rack.over .rack-back { box-shadow: 0 0 0 4px var(--sun); }
 .rack.waiting { filter: saturate(0.85) brightness(0.96); }
 
 /* 오른쪽: 메뉴 · 789/777 · 되돌리기 · 남은 타일 · 1장 받기/끝내기 */
@@ -262,7 +268,7 @@ body.framed #stage { border-radius: 26px; box-shadow: 0 0 0 5px var(--ink), 0 14
   background: var(--cream); border: 2.5px solid var(--ink); border-radius: 12px; box-shadow: 0 3px 0 var(--ink);
 }
 .pool small { font-size: 10px; color: var(--muted); }
-.main-btn { margin-top: auto; min-height: 76px; font-size: 18px; padding: 6px 4px; line-height: 1.2; }
+.main-btn { margin-top: auto; min-height: 76px; font-size: 17px; padding: 6px 2px; line-height: 1.2; word-break: keep-all; }
 
 /* ---------- 끌기 ---------- */
 .drag-ghost { position: absolute; left: 0; top: 0; z-index: 50; display: flex; gap: 3px; pointer-events: none; }

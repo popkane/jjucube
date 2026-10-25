@@ -2,7 +2,7 @@
 // layout = { [타일id]: [줄, 칸] }, board = { rows, cols }. 화면과 무관한 순수 함수만 둔다.
 import { analyzeSet, tileOf, sortRack } from './engine.js';
 
-export const DEFAULT_BOARD = { rows: 5, cols: 18 };
+export const DEFAULT_BOARD = { rows: 4, cols: 14 };
 
 export function makeGrid(layout, board) {
   const g = Array.from({ length: board.rows }, () => Array(board.cols).fill(null));

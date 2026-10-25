@@ -608,7 +608,8 @@ function renderTable() {
   const W = box.clientWidth - 16;
   const H = box.clientHeight - 16;
   const needRows = Math.max(board.rows, usedRows(layout));
-  const w = Math.max(18, Math.min(48, W / board.cols, H / (needRows * RATIO)));
+  // 타일은 크게(최대 46). 줄이 많아져도 줄이지 않고 테이블을 위아래로 밀어서 본다. 칸이 많을 때만 폭에 맞춰 작아짐
+  const w = Math.max(18, Math.min(46, W / board.cols));
   const h = w * RATIO;
   const rows = Math.max(needRows, Math.floor(H / h));
   const el = document.createElement('div');
@@ -678,6 +679,16 @@ function renderRack() {
   const x = (c) => c * (w + gap);
   const y = (r) => r * (h + gap);
   const mine = canAct();
+  // 원목 받침대: 뒤판(윗단) + 앞판(아랫단 타일 아래쪽을 살짝 가림)
+  const back = document.createElement('div');
+  back.className = 'rack-back';
+  Object.assign(back.style, { top: `${h * 0.45}px`, height: `${y(1) + h * 0.8 - h * 0.45}px` }); // 앞판 뒤까지 이어지게
+  grid.append(back);
+  const front = document.createElement('div');
+  front.className = 'rack-front';
+  Object.assign(front.style, { top: `${y(1) + h * 0.72}px`, height: `${h * 0.48}px` });
+  front.innerHTML = '<span>강릉큐브</span>';
+  grid.append(front);
   for (const g of rackGroups(rackPos)) {
     if (!g.valid) continue;
     const s = document.createElement('div');
