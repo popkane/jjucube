@@ -1012,6 +1012,13 @@ function findDrop(pt, ids, grab) {
   if (el.closest('#table') && canAct()) {
     const o = stagePos(geo.el);
     const at = { colF: (firstX - o.x) / geo.w, rowF: (pt.sy - o.y) / geo.h };
+    // 타일 위에 놓으면 끼워 넣기: 타일의 왼쪽 절반이면 그 앞, 오른쪽 절반이면 그 뒤
+    const row = Math.floor(at.rowF);
+    const col = Math.floor(at.colF);
+    const moving = new Set(ids);
+    const onTile = row >= 0 && row < geo.rows && Object.entries(work.layout)
+      .some(([id, [r, c]]) => !moving.has(Number(id)) && r === row && c === col);
+    if (onTile) return { type: 'board', spot: { row, start: Math.max(0, Math.round(at.colF)), insert: true }, at };
     const spot = nearestFree(work.layout, viewBoard(), ids, at);
     return spot ? { type: 'board', spot, at } : null;
   }
@@ -1028,12 +1035,13 @@ function showTarget(dest, ids, pt) {
     const o = stagePos(geo.el);
     geo.el.style.setProperty('--mx', `${pt.sx - o.x}px`);
     geo.el.style.setProperty('--my', `${pt.sy - o.y}px`);
-    // 판 끝 바깥에 넣으면(줄이 밀리며 들어감) 그 끝에 빛나는 막대로 보여준다
+    // 판 끝 바깥에 넣거나 타일 사이에 끼워 넣으면 그 자리에 빛나는 막대로 보여준다
     const edgeL = dest.spot.start < 0;
     const edgeR = dest.spot.start + ids.length > geo.cols;
-    bt.classList.toggle('edge', edgeL || edgeR);
-    const left = edgeL ? -3 : edgeR ? geo.cols * geo.w - 3 : dest.spot.start * geo.w;
-    Object.assign(bt.style, { left: `${left}px`, top: `${dest.spot.row * geo.h}px`, width: edgeL || edgeR ? '6px' : `${ids.length * geo.w}px`, height: `${geo.h}px` });
+    const bar = edgeL || edgeR || dest.spot.insert;
+    bt.classList.toggle('edge', bar);
+    const left = edgeL ? -3 : edgeR && !dest.spot.insert ? geo.cols * geo.w - 3 : dest.spot.start * geo.w - (bar ? 3 : 0);
+    Object.assign(bt.style, { left: `${left}px`, top: `${dest.spot.row * geo.h}px`, width: bar ? '6px' : `${ids.length * geo.w}px`, height: `${geo.h}px` });
   } else if (dest?.type === 'rack' && dest.spot) {
     const cell = rackGeo.w + rackGeo.gap;
     rt.classList.toggle('insert', !!dest.insert); // 끼워 넣기: 그 자리 왼쪽에 막대

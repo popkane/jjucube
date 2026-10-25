@@ -167,8 +167,13 @@ function settleRow(layout, board, row, anchor, locked) {
 }
 
 // ids를 spot(={row,start})에 놓고 그 줄을 정리한다. 돌려주는 값: { layout, board }
+// spot.insert 이면 끼워 넣기: 그 줄에서 spot.start 칸부터 오른쪽 타일을 k칸 밀고 그 자리에 넣는다
+// (예: 4 5 6 7 8 9 의 6과 7 사이에 7 → 4 5 6 7 | 7 8 9 로 나뉘며 7 8 9가 밀림)
 export function dropTiles(layout, board, ids, spot, locked = null) {
   const out = without(layout, ids);
+  if (spot.insert) {
+    for (const [id, [r, c]] of Object.entries(out)) if (r === spot.row && c >= spot.start) out[id] = [r, c + ids.length];
+  }
   ids.forEach((id, i) => { out[id] = [spot.row, spot.start + i]; });
   const cols = settleRow(out, board, spot.row, ids[0], locked);
   return { layout: out, board: { rows: Math.max(board.rows, spot.row + 1), cols: Math.max(board.cols, cols) } };
