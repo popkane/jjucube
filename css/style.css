@@ -406,7 +406,10 @@ body.framed #stage { border-radius: 26px; box-shadow: 0 0 0 5px var(--ink), 0 14
   .room-code span { animation: digitBob 2.4s ease-in-out infinite; }
   .logo .tile { animation: logoBob 2.8s ease-in-out infinite; }
   .player.active .av { animation: activeBob 1.6s ease-in-out infinite; }
+  .scene .kimbap { animation: kimbapFloat 3.4s ease-in-out infinite; }
 }
+@keyframes kimbapFloat { 50% { transform: translateY(-4px) rotate(4deg); } }
+.scene .kimbap { transform-box: fill-box; transform-origin: center; }
 @keyframes drift { from { transform: translateX(-140px); } to { transform: translateX(1020px); } }
 @keyframes waveSlide { to { background-position-x: -240px; } }
 @keyframes bubbleUp { 0% { transform: translateY(0) scale(0.6); opacity: 0; } 15% { opacity: 0.9; } 100% { transform: translateY(-260px) scale(1.1); opacity: 0; } }
