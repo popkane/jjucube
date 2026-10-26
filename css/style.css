@@ -417,6 +417,7 @@ body.framed #stage { border-radius: 26px; box-shadow: 0 0 0 5px var(--ink), 0 14
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .char-box { display: grid; gap: 6px; }
+.seats li.away { opacity: 0.55; }
 .char-box .label small { font-size: 11px; }
 .seats li.filled { display: flex; align-items: center; gap: 8px; padding-top: 6px; padding-bottom: 6px; }
 .seats li .avatar { width: 30px; height: 30px; box-shadow: 0 2px 0 var(--ink); }

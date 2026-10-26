@@ -95,21 +95,22 @@ export function leaveLobby(code, seat, host) {
   return host ? remove(roomRef(code)) : set(roomRef(code, `seats/${seat}`), null);
 }
 
-// 대기실에서 창을 닫거나 연결이 끊기면 서버가 알아서: 방장이면 방을 지우고, 아니면 내 자리만 비운다.
-// 돌려주는 함수를 부르면 취소 (게임이 시작되면 취소해서, 잠깐 끊겨도 방이 안 없어지게)
-export function armLobbyCleanup(code, seat, host) {
-  const r = host ? roomRef(code) : roomRef(code, `seats/${seat}`);
-  onDisconnect(r).remove().catch(() => {});
-  return () => { onDisconnect(r).cancel().catch(() => {}); };
-}
+// (예전에는 대기실에서 연결이 끊기면 방을 자동으로 지웠는데, 폰에서 카톡으로 방 번호를 보내러 잠깐 나갔다 오면
+//  연결이 끊긴 걸로 쳐서 방이 사라졌다(10/26). 그래서 자동 삭제는 없앴다. 나가기 버튼으로만 방·자리가 지워지고,
+//  버려진 방 번호는 하루 뒤 새 방에 다시 쓰인다.)
 
-// 이어할 수 있는 방인지: 방이 있고, 내가 앉아 있고, 게임이 아직 진행 중
+// 다시 들어갈 수 있는 방인지: 방이 있고 내가 앉아 있으면 'lobby'(대기실) 또는 'playing'(게임 진행 중), 아니면 false
 export async function canResume(code, uid) {
   const room = (await get(roomRef(code))).val();
-  if (!room?.meta || room.meta.status !== 'playing' || !room.sync) return false;
+  if (!room?.meta) return false;
+  if (room.meta.status === 'lobby') {
+    if (serverNow() - (room.meta.created || 0) > 6 * 3600 * 1000) return false;
+    return seatList(room.seats).some((s) => s && s.uid === uid) ? 'lobby' : false;
+  }
+  if (room.meta.status !== 'playing' || !room.sync) return false;
   if (serverNow() - (room.sync.deadline || 0) > 6 * 3600 * 1000) return false; // 6시간 넘게 아무도 안 둔 판은 버려진 것
   if (!seatList(room.seats).some((s) => s && s.uid === uid)) return false;
-  try { return JSON.parse(room.sync.game).status === 'playing'; } catch { return false; }
+  try { return JSON.parse(room.sync.game).status === 'playing' ? 'playing' : false; } catch { return false; }
 }
 
 export function watchRoom(code, cb) {

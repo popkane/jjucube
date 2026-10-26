@@ -11,7 +11,7 @@ import { aiMove, LEVELS } from './ai.js';
 import { CHARACTERS, PLAYER_CHARS, CPU_CHARS, fillCharacters, avatarHtml } from './characters.js';
 import { playTile, playCollect, playShimmer, playTurnBell, playJoin, playStart, playWin, startClock, playEmote, unlockAudio, setSoundEnabled } from './sound.js';
 import {
-  signIn, serverNow, seatList, createRoom, joinRoom, leaveLobby, armLobbyCleanup, canResume, markOnline, watchRoom, startRoom, commitSync, setLive, sendEmote, pickChar,
+  signIn, serverNow, seatList, createRoom, joinRoom, leaveLobby, canResume, markOnline, watchRoom, startRoom, commitSync, setLive, sendEmote, pickChar,
 } from './net.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -213,13 +213,15 @@ function showHome() {
   $('#createForm').hidden = true;
   $('#joinForm').hidden = true;
   $('#cpuForm').hidden = true;
-  // 온라인 이어하기는 그 방에서 게임이 아직 진행 중일 때만 보여준다 (끝났거나 없어진 방이면 기억도 지움)
+  // 온라인 이어하기: 게임 중인 방이면 이어하기 버튼, 대기실이면(카톡 다녀오다 앱이 새로 열린 경우 등) 바로 대기실로
+  // (끝났거나 없어진 방이면 기억도 지움)
   $('#resumeBtn').hidden = true;
   const saved = store.get(KEY.room);
   if (saved) {
     ready.then(() => canResume(saved, uid)).then((ok) => {
       if (!ok) { if (store.get(KEY.room) === saved) store.del(KEY.room); return; }
       if (store.get(KEY.room) !== saved || $('#home').hidden) return;
+      if (ok === 'lobby') { $('#resumeBtn').click(); return; }
       $('#resumeBtn').textContent = `이어하기 (방 ${saved})`;
       $('#resumeBtn').hidden = false;
     }).catch(() => {});
@@ -351,7 +353,6 @@ function leaveRoom(goHome = true) {
   clearTimeout(cpuTimer);
   room?.unwatch?.();
   room?.unonline?.();
-  room?.disarm?.();
   mode = null;
   room = null;
   roomData = null;
@@ -374,11 +375,9 @@ function onRoom(data) {
   room.seat = seat;
 
   if (data.meta.status === 'lobby' || !data.sync) {
-    if (!room.disarm) room.disarm = armLobbyCleanup(room.code, seat, data.meta.host === uid);
     renderLobby(seats);
     return;
   }
-  if (room.disarm) { room.disarm(); room.disarm = null; }
 
   const sync = data.sync;
   if (sync.rev !== rev) {
@@ -468,6 +467,8 @@ function renderLobby(seats) {
     if (s) {
       li.innerHTML = Number.isInteger(s.char) ? avatarHtml(s.char) : '';
       li.append(`${s.name}${s.uid === uid ? ' (나)' : ''}${s.uid === meta.host ? ' · 방장' : ''}`);
+      // 카톡 등으로 잠깐 나가 있으면 흐리게 (돌아오면 저절로 다시 진하게)
+      if (s.uid !== uid && !roomData.online?.[i]) { li.classList.add('away'); li.append(' · 잠깐 자리 비움'); }
     } else li.textContent = '기다리는 중…';
     list.append(li);
   }
