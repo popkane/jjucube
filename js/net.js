@@ -129,3 +129,8 @@ export async function commitSync(code, expectedRev, sync) {
 export function setLive(code, live) {
   return set(roomRef(code, 'live'), live);
 }
+
+// 이모티콘(박수·울기·키득): 마지막 하나만 덮어쓴다. k = 매번 다른 값(같은 걸 연달아 보내도 새 것으로 알아보게)
+export function sendEmote(code, emote) {
+  return set(roomRef(code, 'emote'), emote);
+}

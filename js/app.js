@@ -9,9 +9,9 @@ import { DEFAULT_BOARD, segments, tableOf, nearestFree, dropTiles, blockOrder, a
 import { syncRack, arrangeRack, rackCols, nearestFreeSlot, placeInRack, insertIntoRack, RACK_ROWS } from './rack.js';
 import { aiMove, LEVELS } from './ai.js';
 import { CHARACTERS, pickCharacters, avatarHtml } from './characters.js';
-import { playTile, playCollect, playShimmer, playTurnBell, playJoin, playStart, playWin, startClock, unlockAudio, setSoundEnabled } from './sound.js';
+import { playTile, playCollect, playShimmer, playTurnBell, playJoin, playStart, playWin, startClock, playEmote, unlockAudio, setSoundEnabled } from './sound.js';
 import {
-  signIn, serverNow, seatList, createRoom, joinRoom, leaveLobby, armLobbyCleanup, canResume, markOnline, watchRoom, startRoom, commitSync, setLive,
+  signIn, serverNow, seatList, createRoom, joinRoom, leaveLobby, armLobbyCleanup, canResume, markOnline, watchRoom, startRoom, commitSync, setLive, sendEmote,
 } from './net.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -56,6 +56,7 @@ let moves = 0;              // 이번 차례에 옮긴 횟수
 let startTableIds = new Set();
 let lobbySeen = { code: null, n: 0 }; // 대기실 인원 (들어올 때 소리)
 let endSoundGid = null;     // 승리 소리를 낸 판
+let lastEmoteKey = null;    // 이미 보여 준 이모티콘 (같은 걸 두 번 띄우지 않게)
 let clockRev = null;        // 초시계 소리를 예약한 차례(rev)
 let stopClock = () => {};
 let tableFor = null;        // 테이블을 그리던 판 (같은 판일 때만 날아가는 연출)
@@ -359,6 +360,13 @@ function onRoom(data) {
     const g = JSON.parse(sync.game);
     names = Array.from({ length: g.players }, (_, i) => seats[i]?.name || `플레이어${i + 1}`);
     applyState({ game: g, match: JSON.parse(sync.match), deadline: sync.deadline }, sync.rev, false);
+  }
+
+  // 상대가 보낸 이모티콘 (방금 보낸 것만, 내가 보낸 건 이미 띄웠으니 건너뜀)
+  const em = data.emote;
+  if (em && em.k !== lastEmoteKey) {
+    lastEmoteKey = em.k;
+    if (em.p !== me() && serverNow() - em.n < 5000) showEmote(em.p, em.e);
   }
 
   // 상대가 만지는 중인 테이블 (내 차례면 무시)
@@ -1059,6 +1067,49 @@ $('#mainBtn').addEventListener('click', () => {
 let soundOn = store.get(KEY.sound) !== false;
 setSoundEnabled(soundOn);
 const renderSoundBtn = () => { $('#soundBtn').textContent = `소리: ${soundOn ? '켜짐' : '꺼짐'}`; };
+// ---------- 이모티콘: 😊 → 박수·울기·키득 중 하나 → 보낸 사람 캐릭터 옆에 2초 + 소리. 3초에 한 번만 ----------
+const EMOJI = { clap: '👏', cry: '😭', giggle: '🤭' };
+const EMOTE_COOL = 3000;
+$('#emoteBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  $('#emotePanel').hidden = !$('#emotePanel').hidden;
+});
+$('#emotePanel').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const b = e.target.closest('button[data-e]');
+  if (!b || $('#emoteBtn').classList.contains('cool')) return;
+  $('#emotePanel').hidden = true;
+  const btn = $('#emoteBtn');
+  btn.classList.add('cool');
+  setTimeout(() => btn.classList.remove('cool'), EMOTE_COOL);
+  showEmote(me(), b.dataset.e);
+  if (mode === 'online' && room) {
+    const k = `${me()}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    lastEmoteKey = k;
+    sendEmote(room.code, { p: me(), e: b.dataset.e, n: serverNow(), k }).catch(() => {});
+  }
+});
+// 고르는 창 밖을 누르면 닫힘
+document.addEventListener('click', (e) => {
+  if (!$('#emotePanel').hidden && !e.target.closest('#emotePanel')) $('#emotePanel').hidden = true;
+});
+function showEmote(p, kind) {
+  if (!EMOJI[kind]) return;
+  playEmote(kind);
+  const rect = avatarRect(p, 0);
+  if (!rect) return;
+  // 같은 사람이 이미 띄운 말풍선은 바로 치움 (겹치지 않게)
+  document.querySelector(`.emote-pop[data-p="${p}"]`)?.remove();
+  const pop = document.createElement('div');
+  pop.className = 'emote-pop';
+  pop.dataset.p = p;
+  pop.textContent = EMOJI[kind];
+  pop.style.left = `${rect.x + 34}px`;
+  pop.style.top = `${rect.y - 34}px`;
+  $('#stage').append(pop);
+  setTimeout(() => pop.remove(), 2300);
+}
+
 $('#menuBtn').addEventListener('click', () => {
   renderSoundBtn();
   $('#menuRoom').textContent = mode === 'cpu' ? `컴퓨터전 (${LEVELS[cpuLevel]})` : room ? `방 번호 ${room.code}` : '';

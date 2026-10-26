@@ -213,3 +213,68 @@ export function playShimmer() {
   note(t + 0.38, 1567.98, 1.0, 0.04, 'sine');
   for (let i = 0; i < 6; i++) click(t + 0.05 + i * 0.07, 6000 + Math.random() * 2000, 0.05, 0.04); // 반짝반짝
 }
+
+// ---------- 이모티콘 소리 (약 2초, 만화풍) ----------
+// 목소리 비슷한 소리: 톱니파를 입 모양 대역(formant)으로 걸러서, 음높이를 f0 → f1로 미끄러뜨리고 살짝 떨림
+function voice(t, f0, f1, len, gain, formant = 1100, vib = 0) {
+  const o = ctx.createOscillator();
+  o.type = 'sawtooth';
+  o.frequency.setValueAtTime(f0, t);
+  o.frequency.exponentialRampToValueAtTime(f1, t + len);
+  if (vib) {
+    const lfo = ctx.createOscillator();
+    const depth = ctx.createGain();
+    lfo.frequency.value = 6.5;
+    depth.gain.value = vib;
+    lfo.connect(depth).connect(o.frequency);
+    lfo.start(t);
+    lfo.stop(t + len + 0.02);
+  }
+  const bp = ctx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = formant;
+  bp.Q.value = 2.2;
+  const v = ctx.createGain();
+  v.gain.setValueAtTime(0.0001, t);
+  v.gain.exponentialRampToValueAtTime(gain, t + Math.min(0.04, len / 4));
+  v.gain.setValueAtTime(gain, t + len * 0.7);
+  v.gain.exponentialRampToValueAtTime(0.0001, t + len);
+  o.connect(bp).connect(v).connect(ctx.destination);
+  o.start(t);
+  o.stop(t + len + 0.02);
+}
+
+// 👏 짝짝짝: 두세 사람이 치는 박수가 커졌다 잦아듦 (1.9초)
+function clapSound(t0) {
+  const dur = 1.9;
+  for (let t = 0; t < dur; t += 0.055 + Math.random() * 0.05) {
+    const env = Math.sin((Math.PI * t) / dur); // 커졌다 작아짐
+    const v = 0.85 + Math.random() * 0.3;
+    click(t0 + t, 1500 * v, 0.55 * env + 0.05, 0.03);
+    click(t0 + t + 0.004, 2600 * v, 0.25 * env, 0.02);
+  }
+}
+
+// 😭 으아앙~ 엉엉: 길게 울고 두 번 흐느낌 (2초)
+function crySound(t0) {
+  voice(t0, 560, 430, 0.8, 0.22, 1000, 18);
+  voice(t0 + 0.95, 500, 420, 0.32, 0.2, 900, 10);
+  voice(t0 + 1.4, 480, 380, 0.5, 0.18, 850, 14);
+}
+
+// 🤭 키득키득 크크: 짧고 높은 웃음 두 묶음 (1.8초)
+function giggleSound(t0) {
+  const burst = (t, n, f) => {
+    for (let i = 0; i < n; i++) voice(t + i * 0.11, f * (1 - i * 0.03), f * (0.9 - i * 0.03), 0.07, 0.16, 2200);
+  };
+  burst(t0, 4, 950);
+  burst(t0 + 0.75, 5, 880);
+}
+
+export function playEmote(kind) {
+  if (!ready()) return;
+  const t = ctx.currentTime + 0.02;
+  if (kind === 'clap') clapSound(t);
+  else if (kind === 'cry') crySound(t);
+  else if (kind === 'giggle') giggleSound(t);
+}

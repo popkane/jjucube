@@ -30,10 +30,13 @@
   <button data-s="collect">↩️ 사라락<small>타일이 받침대로 돌아올 때</small></button>
   <button data-s="join">🚪 뾰롱<small>대기실에 누가 들어올 때</small></button>
   <button data-s="start">🌊 빠라밤<small>판이 시작될 때</small></button>
+  <button data-s="clap">👏 박수<small>이모티콘</small></button>
+  <button data-s="cry">😭 울기<small>이모티콘</small></button>
+  <button data-s="giggle">🤭 키득<small>이모티콘</small></button>
   <button data-s="win">🏆 승리<small>내가 이겼을 때 / 다른 사람이 이겼을 때</small></button>
 </div>
 <script type="module">
-  import * as S from './js/sound.js?v=preview3';
+  import * as S from './js/sound.js?v=preview4';
   let stop = () => {};
   const play = {
     clock: () => { stop(); stop = S.startClock(5000); },
@@ -43,6 +46,9 @@
     collect: () => S.playCollect(4),
     join: () => S.playJoin(),
     start: () => S.playStart(),
+    clap: () => S.playEmote('clap'),
+    cry: () => S.playEmote('cry'),
+    giggle: () => S.playEmote('giggle'),
     win: () => { S.playWin(true); setTimeout(() => S.playWin(false), 2200); },
   };
   document.querySelector('.list').addEventListener('click', (e) => {

@@ -259,6 +259,35 @@ body.framed #stage { border-radius: 26px; box-shadow: 0 0 0 5px var(--ink), 0 14
   background: var(--sky); border-left: 3px solid var(--ink);
 }
 .side-right .icon-btn { width: 100%; }
+/* 맨 위: 메뉴 + 이모티콘 버튼 나란히 */
+.top-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; width: 100%; position: relative; }
+.side-right { position: relative; }
+.top-btns .icon-btn { padding: 0; }
+.emote-btn { position: relative; overflow: hidden; font-size: 18px; }
+/* 한 번 보내면 3초 동안 못 누름: 회색 + 아래에서 차오르는 막대 */
+.emote-btn.cool { filter: grayscale(1); opacity: 0.6; pointer-events: none; }
+.emote-btn.cool::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 100%; background: rgba(43, 45, 66, 0.25); animation: cooldown 3s linear forwards; }
+@keyframes cooldown { to { height: 0; } }
+/* 이모티콘 고르기: 버튼 왼쪽(테이블 위)으로 펼쳐짐 */
+.emote-panel {
+  position: absolute; right: calc(100% + 6px); top: 8px; z-index: 30; display: flex; gap: 6px; padding: 6px;
+  background: #fff; border: 3px solid var(--ink); border-radius: 18px; box-shadow: 0 4px 0 var(--ink);
+}
+.emote-panel button { font-size: 30px; line-height: 1; width: 48px; height: 48px; border: 0; border-radius: 12px; background: #e3f5ff; cursor: pointer; }
+.emote-panel button:active { transform: scale(0.92); }
+/* 보낸 사람 캐릭터 옆에 2초 동안 뜨는 말풍선 */
+.emote-pop {
+  position: absolute; left: 0; top: 0; z-index: 60; pointer-events: none; font-size: 34px; line-height: 1;
+  padding: 6px 8px; background: #fff; border: 3px solid var(--ink); border-radius: 18px 18px 18px 4px; box-shadow: 0 3px 0 var(--ink);
+  animation: emotePop 2.2s ease-out forwards;
+}
+@keyframes emotePop {
+  0% { opacity: 0; scale: 0.4; }
+  10% { opacity: 1; scale: 1.15; }
+  18% { scale: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; translate: 0 -10px; }
+}
 .sort-btns { display: grid; width: 100%; border: 3px solid var(--ink); border-radius: 16px; overflow: hidden; box-shadow: 0 4px 0 var(--ink); background: #fff; }
 .sort-btn { border: 0; background: #e3f5ff; font-size: 22px; padding: 9px 0; cursor: pointer; letter-spacing: 1px; }
 .sort-btn + .sort-btn { border-top: 2px solid var(--ink); }
