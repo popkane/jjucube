@@ -1101,9 +1101,24 @@ function showEmote(p, kind) {
   // 같은 사람이 이미 띄운 말풍선은 바로 치움 (겹치지 않게)
   document.querySelector(`.emote-pop[data-p="${p}"]`)?.remove();
   const pop = document.createElement('div');
-  pop.className = 'emote-pop';
+  pop.className = `emote-pop ${kind}`;
   pop.dataset.p = p;
-  pop.textContent = EMOJI[kind];
+  pop.innerHTML = `<span class="em">${EMOJI[kind]}</span>`;
+  // 박수 = 반짝이가 사방으로, 울기 = 눈물이 아래로 뚝뚝, 키득 = ㅋ가 위로 퐁퐁
+  const fx = { clap: ['✨', '🎉', '✨', '⭐', '✨', '🎉'], cry: ['💧', '💧', '💦', '💧', '💧'], giggle: ['ㅋ', 'ㅋ', 'ㅋ', 'ㅋ', 'ㅋ', 'ㅋ'] }[kind];
+  fx.forEach((ch, i) => {
+    const f = document.createElement('span');
+    f.className = 'emote-fx';
+    f.textContent = ch;
+    const ang = kind === 'cry' ? Math.PI / 2 + (i - 2) * 0.35 : kind === 'giggle' ? -Math.PI / 2 + (i - 2.5) * 0.45 : (i / fx.length) * Math.PI * 2;
+    const dist = kind === 'cry' ? 55 + i * 8 : 50 + Math.random() * 20;
+    f.style.setProperty('--dx', `${Math.cos(ang) * dist}px`);
+    f.style.setProperty('--dy', `${Math.sin(ang) * dist}px`);
+    f.style.setProperty('--rot', `${(Math.random() - 0.5) * 60}deg`);
+    f.style.animationDelay = `${i * (kind === 'cry' ? 0.22 : 0.08)}s`;
+    if (kind === 'giggle') Object.assign(f.style, { color: 'var(--sunset)', fontWeight: 700 });
+    pop.append(f);
+  });
   pop.style.left = `${rect.x + 34}px`;
   pop.style.top = `${rect.y - 34}px`;
   $('#stage').append(pop);

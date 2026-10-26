@@ -244,31 +244,105 @@ function voice(t, f0, f1, len, gain, formant = 1100, vib = 0) {
   o.stop(t + len + 0.02);
 }
 
-// 👏 짝짝짝: 두세 사람이 치는 박수가 커졌다 잦아듦 (1.9초)
-function clapSound(t0) {
-  const dur = 1.9;
-  for (let t = 0; t < dur; t += 0.055 + Math.random() * 0.05) {
-    const env = Math.sin((Math.PI * t) / dur); // 커졌다 작아짐
-    const v = 0.85 + Math.random() * 0.3;
-    click(t0 + t, 1500 * v, 0.55 * env + 0.05, 0.03);
-    click(t0 + t + 0.004, 2600 * v, 0.25 * env, 0.02);
+// 음높이가 여러 번 꺾이는 목소리 (points = [[시간, 높이], ...]), 입 모양도 따라 바뀜 (fpts = [[시간, 대역], ...])
+function voicePath(t, points, gain, fpts, vib = 0) {
+  const len = points[points.length - 1][0];
+  const o = ctx.createOscillator();
+  o.type = 'sawtooth';
+  o.frequency.setValueAtTime(points[0][1], t);
+  for (const [d, f] of points.slice(1)) o.frequency.linearRampToValueAtTime(f, t + d);
+  if (vib) {
+    const lfo = ctx.createOscillator();
+    const depth = ctx.createGain();
+    lfo.frequency.value = 7;
+    depth.gain.value = vib;
+    lfo.connect(depth).connect(o.frequency);
+    lfo.start(t);
+    lfo.stop(t + len + 0.02);
   }
+  const bp = ctx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.Q.value = 2;
+  bp.frequency.setValueAtTime(fpts[0][1], t);
+  for (const [d, f] of fpts.slice(1)) bp.frequency.linearRampToValueAtTime(f, t + d);
+  const v = ctx.createGain();
+  v.gain.setValueAtTime(0.0001, t);
+  v.gain.exponentialRampToValueAtTime(gain, t + 0.05);
+  v.gain.setValueAtTime(gain, t + len * 0.8);
+  v.gain.exponentialRampToValueAtTime(0.0001, t + len);
+  o.connect(bp).connect(v).connect(ctx.destination);
+  o.start(t);
+  o.stop(t + len + 0.02);
+}
+// 관중 '와아~': 잡음이 부풀었다 가라앉음
+function crowd(t, len, gain) {
+  const src = ctx.createBufferSource();
+  src.buffer = noise;
+  src.loop = true;
+  const bp = ctx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.Q.value = 0.8;
+  bp.frequency.setValueAtTime(900, t);
+  bp.frequency.linearRampToValueAtTime(1600, t + len * 0.4);
+  bp.frequency.linearRampToValueAtTime(1000, t + len);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(gain, t + len * 0.35);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+  src.connect(bp).connect(g).connect(ctx.destination);
+  src.start(t);
+  src.stop(t + len + 0.02);
+}
+// 휘파람 '휘이익~'
+function whistle(t, gain) {
+  const o = ctx.createOscillator();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(1300, t);
+  o.frequency.exponentialRampToValueAtTime(2700, t + 0.22);
+  o.frequency.setValueAtTime(2700, t + 0.3);
+  o.frequency.exponentialRampToValueAtTime(1900, t + 0.6);
+  const v = ctx.createGain();
+  v.gain.setValueAtTime(0.0001, t);
+  v.gain.exponentialRampToValueAtTime(gain, t + 0.04);
+  v.gain.setValueAtTime(gain, t + 0.5);
+  v.gain.exponentialRampToValueAtTime(0.0001, t + 0.65);
+  o.connect(v).connect(ctx.destination);
+  o.start(t);
+  o.stop(t + 0.7);
 }
 
-// 😭 으아앙~ 엉엉: 길게 울고 두 번 흐느낌 (2초)
+// 👏 우와아~ 짝짝짝짝 + 휘이익~ : 관중 박수갈채 (2초)
+function clapSound(t0) {
+  const dur = 2.0;
+  for (let t = 0; t < dur; t += 0.022 + Math.random() * 0.035) {
+    const env = Math.sin((Math.PI * Math.min(t + 0.15, dur)) / (dur + 0.15));
+    const v = 0.8 + Math.random() * 0.4;
+    click(t0 + t, 1400 * v, 0.75 * env + 0.05, 0.035);
+    click(t0 + t + 0.003, 2800 * v, 0.35 * env, 0.02);
+  }
+  crowd(t0, 1.9, 0.22);
+  whistle(t0 + 0.25, 0.13);
+  whistle(t0 + 1.05, 0.1);
+}
+
+// 😭 으아아아앙~~ 흑 흑 흐어엉 : 과장된 대성통곡 (2.2초)
 function crySound(t0) {
-  voice(t0, 560, 430, 0.8, 0.22, 1000, 18);
-  voice(t0 + 0.95, 500, 420, 0.32, 0.2, 900, 10);
-  voice(t0 + 1.4, 480, 380, 0.5, 0.18, 850, 14);
+  voicePath(t0, [[0, 380], [0.18, 860], [0.85, 780], [1.15, 470]], 0.32, [[0, 700], [0.2, 1400], [0.9, 1200], [1.15, 650]], 38);
+  voice(t0 + 1.28, 760, 520, 0.09, 0.28, 1500);  // 흑
+  voice(t0 + 1.48, 720, 500, 0.09, 0.28, 1500);  // 흑
+  voicePath(t0 + 1.66, [[0, 640], [0.12, 700], [0.5, 360]], 0.26, [[0, 1100], [0.5, 600]], 30); // 흐어엉
 }
 
-// 🤭 키득키득 크크: 짧고 높은 웃음 두 묶음 (1.8초)
+// 🤭 끼히히히히 크크크 푸하핫! : 점점 빨라지고 높아지다 터지는 비웃음 (2초)
 function giggleSound(t0) {
-  const burst = (t, n, f) => {
-    for (let i = 0; i < n; i++) voice(t + i * 0.11, f * (1 - i * 0.03), f * (0.9 - i * 0.03), 0.07, 0.16, 2200);
-  };
-  burst(t0, 4, 950);
-  burst(t0 + 0.75, 5, 880);
+  let t = 0;
+  for (let i = 0; i < 10; i++) {
+    const f = 880 + i * 55 + (i % 2) * 90; // 히-키-히-키 오르내리며 높아짐
+    voice(t0 + t, f * 1.08, f * 0.88, 0.065, 0.24, i % 2 ? 1900 : 2500);
+    t += 0.13 - i * 0.007;
+  }
+  voicePath(t0 + t + 0.05, [[0, 620], [0.08, 1150], [0.32, 900]], 0.3, [[0, 1200], [0.1, 2200], [0.32, 1500]], 20); // 푸하핫!
+  click(t0 + t + 0.42, 300, 0.4, 0.06); // 큭 (코웃음)
 }
 
 export function playEmote(kind) {

@@ -277,9 +277,23 @@ body.framed #stage { border-radius: 26px; box-shadow: 0 0 0 5px var(--ink), 0 14
 .emote-panel button:active { transform: scale(0.92); }
 /* 보낸 사람 캐릭터 옆에 2초 동안 뜨는 말풍선 */
 .emote-pop {
-  position: absolute; left: 0; top: 0; z-index: 60; pointer-events: none; font-size: 34px; line-height: 1;
+  position: absolute; left: 0; top: 0; z-index: 60; pointer-events: none; font-size: 46px; line-height: 1;
   padding: 6px 8px; background: #fff; border: 3px solid var(--ink); border-radius: 18px 18px 18px 4px; box-shadow: 0 3px 0 var(--ink);
   animation: emotePop 2.2s ease-out forwards;
+}
+.emote-pop .em { display: inline-block; }
+.emote-pop.clap .em { animation: emClap 0.22s ease-in-out 8 alternate; }
+.emote-pop.cry .em { animation: emCry 0.3s ease-in-out 6 alternate; }
+.emote-pop.giggle .em { animation: emGiggle 0.09s linear 18 alternate; }
+@keyframes emClap { to { transform: scale(1.25) rotate(-8deg); } }
+@keyframes emCry { to { transform: translateY(3px) scaleY(0.9); } }
+@keyframes emGiggle { from { transform: rotate(-12deg); } to { transform: rotate(12deg) translateY(-2px); } }
+/* 말풍선 주변으로 튀어 나가는 작은 효과 */
+.emote-fx { position: absolute; left: 50%; top: 50%; font-size: 18px; animation: emFx 1.4s ease-out forwards; opacity: 0; }
+@keyframes emFx {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+  15% { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.1) rotate(var(--rot)); }
 }
 @keyframes emotePop {
   0% { opacity: 0; scale: 0.4; }
