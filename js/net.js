@@ -37,20 +37,21 @@ export function seatList(v) {
 }
 const seatObj = (seats) => Object.fromEntries(seats.map((s, i) => [i, s]).filter(([, s]) => s));
 
-export async function createRoom({ uid, name, players, seconds }) {
+export async function createRoom({ uid, name, players, seconds, char = 0 }) {
   for (let tries = 0; tries < 20; tries++) {
     const code = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
     const now = serverNow();
     const res = await runTransaction(roomRef(code), (cur) => {
       if (cur && cur.meta && now - (cur.meta.created || 0) < ROOM_TTL) return undefined; // 쓰는 중인 번호
-      return { meta: { host: uid, players, seconds, status: 'lobby', created: now }, seats: { 0: { uid, name } } };
+      return { meta: { host: uid, players, seconds, status: 'lobby', created: now }, seats: { 0: { uid, name, char } } };
     });
     if (res.committed) return { code, seat: 0 };
   }
   throw new Error('방 번호를 만들지 못했어요. 다시 해 주세요');
 }
 
-export async function joinRoom({ code, uid, name }) {
+// char: 내가 고르고 싶은 캐릭터. 이미 다른 사람이 골랐으면 남은 것 중 첫 번째
+export async function joinRoom({ code, uid, name, char = 0, total = 6 }) {
   const meta = (await get(roomRef(code, 'meta'))).val();
   if (!meta) throw new Error('없는 방 번호예요');
   // 이미 앉아 있던 방이면 그대로 다시 들어온다 (트랜잭션은 처음에 빈 값으로 돌 수 있어서 먼저 읽어 본다)
@@ -64,10 +65,13 @@ export async function joinRoom({ code, uid, name }) {
   const res = await runTransaction(roomRef(code, 'seats'), (cur) => {
     const seats = seatList(cur);
     const mine = seats.findIndex((s) => s && s.uid === uid);
-    if (mine >= 0) { seat = mine; seats[mine] = { uid, name }; return seatObj(seats); } // 다시 들어오기
+    if (mine >= 0) { seat = mine; seats[mine] = { ...seats[mine], uid, name }; return seatObj(seats); } // 다시 들어오기
     if (meta.status !== 'lobby') return undefined;
+    const taken = new Set(seats.filter(Boolean).map((s) => s.char));
+    let c = char;
+    if (taken.has(c)) c = [...Array(total).keys()].find((i) => !taken.has(i)) ?? 0;
     for (let i = 0; i < meta.players; i++) {
-      if (!seats[i]) { seat = i; seats[i] = { uid, name }; return seatObj(seats); }
+      if (!seats[i]) { seat = i; seats[i] = { uid, name, char: c }; return seatObj(seats); }
     }
     return undefined; // 꽉 참
   });
@@ -133,4 +137,18 @@ export function setLive(code, live) {
 // 이모티콘(박수·울기·키득): 마지막 하나만 덮어쓴다. k = 매번 다른 값(같은 걸 연달아 보내도 새 것으로 알아보게)
 export function sendEmote(code, emote) {
   return set(roomRef(code, 'emote'), emote);
+}
+
+// 대기실에서 캐릭터 고르기: 다른 사람이 이미 고른 거면 안 바뀜(동시에 눌러도 한 사람만). 바뀌면 true
+export async function pickChar(code, seat, char) {
+  const before = seatList((await get(roomRef(code, 'seats'))).val()); // 트랜잭션이 빈 값으로 먼저 도는 것 대비
+  if (before.some((s, i) => s && i !== seat && s.char === char)) return false;
+  const res = await runTransaction(roomRef(code, 'seats'), (cur) => {
+    const seats = seatList(cur);
+    if (!seats[seat]) return undefined;
+    if (seats.some((s, i) => s && i !== seat && s.char === char)) return undefined;
+    seats[seat] = { ...seats[seat], char };
+    return seatObj(seats);
+  });
+  return res.committed;
 }

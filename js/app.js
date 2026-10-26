@@ -8,14 +8,14 @@ import {
 import { DEFAULT_BOARD, segments, tableOf, nearestFree, dropTiles, blockOrder, arrangeTable } from './board.js';
 import { syncRack, arrangeRack, rackCols, nearestFreeSlot, placeInRack, insertIntoRack, RACK_ROWS } from './rack.js';
 import { aiMove, LEVELS } from './ai.js';
-import { CHARACTERS, pickCharacters, avatarHtml } from './characters.js';
+import { CHARACTERS, PLAYER_CHARS, CPU_CHARS, fillCharacters, avatarHtml } from './characters.js';
 import { playTile, playCollect, playShimmer, playTurnBell, playJoin, playStart, playWin, startClock, playEmote, unlockAudio, setSoundEnabled } from './sound.js';
 import {
-  signIn, serverNow, seatList, createRoom, joinRoom, leaveLobby, armLobbyCleanup, canResume, markOnline, watchRoom, startRoom, commitSync, setLive, sendEmote,
+  signIn, serverNow, seatList, createRoom, joinRoom, leaveLobby, armLobbyCleanup, canResume, markOnline, watchRoom, startRoom, commitSync, setLive, sendEmote, pickChar,
 } from './net.js';
 
 const $ = (sel) => document.querySelector(sel);
-const KEY = { rack: 'rumikyub.rack', sound: 'rumikyub.sound', name: 'rumikyub.name', room: 'rumikyub.room', setup: 'rumikyub.setup', cpu: 'rumikyub.cpu' };
+const KEY = { rack: 'rumikyub.rack', sound: 'rumikyub.sound', name: 'rumikyub.name', room: 'rumikyub.room', setup: 'rumikyub.setup', cpu: 'rumikyub.cpu', char: 'rumikyub.char' };
 const CPU = 1; // 컴퓨터전에서 컴퓨터 자리 (나는 0)
 const RATIO = 1.36; // 타일 세로/가로
 const RACK_GAP = 4;
@@ -181,9 +181,33 @@ function showScreen(id) {
 $('#myName').value = store.get(KEY.name) || '';
 $('#myName').addEventListener('input', () => store.set(KEY.name, $('#myName').value.trim()));
 const myName = () => $('#myName').value.trim() || '이름없음';
+// 내 캐릭터 (시작 화면에서 고름, 이 폰에 기억). 대기실에서 바꾸면 그것도 기억
+const myChar = () => { const c = store.get(KEY.char); return Number.isInteger(c) && c < PLAYER_CHARS ? c : 0; };
+
+// 캐릭터 고르는 줄: taken = { 캐릭터번호: 고른 사람 이름 }
+function renderCharPick(el, selected, taken, onPick) {
+  el.innerHTML = '';
+  for (let i = 0; i < PLAYER_CHARS; i++) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `char-opt${i === selected ? ' on' : ''}${taken[i] !== undefined ? ' taken' : ''}`;
+    b.title = CHARACTERS[i].name;
+    b.innerHTML = avatarHtml(i);
+    if (taken[i] !== undefined) b.dataset.who = taken[i];
+    b.addEventListener('click', () => {
+      if (taken[i] !== undefined) { toast(`${taken[i]}님이 고른 캐릭터예요`); return; }
+      onPick(i);
+    });
+    el.append(b);
+  }
+}
+function renderHomeChars() {
+  renderCharPick($('#homeChars'), myChar(), {}, (i) => { store.set(KEY.char, i); renderHomeChars(); playTile('rack', 1); });
+}
 
 function showHome() {
   showScreen('#home');
+  renderHomeChars();
   for (const id of ['#menu', '#end']) $(id).hidden = true;
   $('#homeMain').hidden = false;
   $('#createForm').hidden = true;
@@ -248,18 +272,18 @@ $('#createForm').addEventListener('submit', (e) => {
   e.preventDefault();
   if (!TURN_SECONDS_OPTIONS.includes(setup.seconds)) setup.seconds = 60;
   store.set(KEY.setup, setup);
-  withConn(async () => enterRoom(await createRoom({ uid, name: myName(), players: setup.players, seconds: setup.seconds })));
+  withConn(async () => enterRoom(await createRoom({ uid, name: myName(), players: setup.players, seconds: setup.seconds, char: myChar() })));
 });
 $('#joinForm').addEventListener('submit', (e) => {
   e.preventDefault();
   const code = $('#joinCode').value.trim();
   if (!/^\d{4}$/.test(code)) { toast('방 번호 4자리를 넣어 주세요'); return; }
-  withConn(async () => enterRoom(await joinRoom({ code, uid, name: myName() })));
+  withConn(async () => enterRoom(await joinRoom({ code, uid, name: myName(), char: myChar(), total: PLAYER_CHARS })));
 });
 $('#resumeBtn').addEventListener('click', () => {
   const code = store.get(KEY.room);
   withConn(async () => {
-    try { enterRoom(await joinRoom({ code, uid, name: myName() })); } catch (err) { store.del(KEY.room); showHome(); throw err; }
+    try { enterRoom(await joinRoom({ code, uid, name: myName(), char: myChar(), total: PLAYER_CHARS })); } catch (err) { store.del(KEY.room); showHome(); throw err; }
   });
 });
 
@@ -284,12 +308,13 @@ function enterCpu(level) {
   mode = 'cpu';
   cpuLevel = level;
   room = { seat: 0 };
-  names = [myName(), '컴퓨터'];
+  // 이름표는 좁아서 짧게 (캐릭터 이름은 소개 창에 '고물 컴퓨터'처럼 전부 나옴)
+  names = [myName(), { easy: '고물컴', normal: '보통컴', hard: '최신컴' }[level] || '컴퓨터'];
 }
 
 function startCpu(level, seconds) {
   enterCpu(level);
-  const g = freshGame(2, seconds);
+  const g = freshGame(2, seconds, [myChar(), CPU_CHARS[level] ?? CPU_CHARS.easy]);
   applyState({ game: g, match: { rounds: 0, totals: [0, 0] }, deadline: serverNow() + seconds * 1000 });
 }
 
@@ -440,9 +465,22 @@ function renderLobby(seats) {
     const li = document.createElement('li');
     const s = seats[i];
     li.className = s ? 'filled' : '';
-    li.textContent = s ? `${s.name}${s.uid === uid ? ' (나)' : ''}${s.uid === meta.host ? ' · 방장' : ''}` : '기다리는 중…';
+    if (s) {
+      li.innerHTML = Number.isInteger(s.char) ? avatarHtml(s.char) : '';
+      li.append(`${s.name}${s.uid === uid ? ' (나)' : ''}${s.uid === meta.host ? ' · 방장' : ''}`);
+    } else li.textContent = '기다리는 중…';
     list.append(li);
   }
+  // 캐릭터 고르기: 남이 고른 건 회색 + 그 사람 이름
+  const mine = seats[room.seat];
+  const taken = {};
+  seats.forEach((s, i) => { if (s && i !== room.seat && Number.isInteger(s.char)) taken[s.char] = s.name; });
+  renderCharPick($('#lobbyChars'), mine?.char, taken, (ch) => {
+    if (ch === mine?.char) return;
+    pickChar(room.code, room.seat, ch).then((ok) => {
+      if (ok) { store.set(KEY.char, ch); playTile('rack', 1); } else toast('방금 다른 사람이 골랐어요');
+    }).catch(() => toast('연결이 불안정해요. 다시 눌러 주세요'));
+  });
   const count = seats.filter(Boolean).length;
   $('#startBtn').hidden = !isHost();
   $('#startBtn').disabled = count < MIN_PLAYERS;
@@ -455,7 +493,7 @@ function renderLobby(seats) {
 $('#startBtn').addEventListener('click', () => withConn(async () => {
   const seats = seatList(roomData.seats).filter(Boolean);
   const players = seats.length;
-  const g = freshGame(players, roomData.meta.seconds);
+  const g = freshGame(players, roomData.meta.seconds, seatChars());
   const m = { rounds: 0, totals: Array(players).fill(0) };
   await startRoom(room.code, players, { rev: (roomData.sync?.rev || 0) + 1, game: JSON.stringify(g), match: JSON.stringify(m), deadline: serverNow() + g.config.turnSeconds * 1000 });
 }));
@@ -466,14 +504,16 @@ $('#leaveLobbyBtn').addEventListener('click', () => {
   if (r) leaveLobby(r.code, r.seat, r.host).catch(() => {});
 });
 
-// 새 판: 엔진 상태 + 바닥 배치 + 사람마다 랜덤 동물 캐릭터 + 판 번호(gid)
-function freshGame(players, seconds) {
+// 새 판: 엔진 상태 + 바닥 배치 + 자리 순서대로 고른 캐릭터 + 판 번호(gid)
+function freshGame(players, seconds, chars) {
   return {
     ...newGame({ players, config: { turnSeconds: seconds } }),
     layout: {}, board: { ...DEFAULT_BOARD },
-    chars: pickCharacters(players), gid: Math.random().toString(36).slice(2, 10),
+    chars, gid: Math.random().toString(36).slice(2, 10),
   };
 }
+// 대기실에서 고른 캐릭터 (앉은 순서, 겹치거나 안 고른 사람은 남은 것으로)
+const seatChars = () => fillCharacters(seatList(roomData.seats).filter(Boolean).map((s) => s.char));
 const charsOf = (g) => g.chars || [0, 1, 2, 3];
 
 // 판이 새로 시작되면 이번 판 캐릭터를 잠깐 보여준다
@@ -1188,14 +1228,14 @@ function confetti() {
 }
 $('#againBtn').addEventListener('click', () => {
   if (mode === 'cpu') {
-    const g = freshGame(2, game.config.turnSeconds);
+    const g = freshGame(2, game.config.turnSeconds, game.chars);
     applyState({ game: g, match, deadline: serverNow() + g.config.turnSeconds * 1000 });
     return;
   }
   againOnline();
 });
 const againOnline = () => withConn(async () => {
-  const g = freshGame(game.players, game.config.turnSeconds);
+  const g = freshGame(game.players, game.config.turnSeconds, seatChars());
   const ok = await commitSync(room.code, rev, { game: JSON.stringify(g), match: JSON.stringify(match), deadline: serverNow() + g.config.turnSeconds * 1000 });
   if (ok) setLive(room.code, null).catch(() => {});
 });

@@ -395,6 +395,32 @@ body.framed #stage { border-radius: 26px; box-shadow: 0 0 0 5px var(--ink), 0 14
   padding: 8px 18px; border-radius: 999px; font-size: 15px; text-align: center; white-space: nowrap;
 }
 
+/* 시작 화면 오른쪽: 캐릭터 줄이 늘어서 조금 촘촘하게 (위쪽 전체화면 버튼과 안 겹치게, 넘치면 위가 잘리지 않게) */
+.home-side { justify-content: safe center; gap: 8px; padding-top: 30px; }
+#homeMain.stack { gap: 8px; }
+.modes { gap: 7px; }
+.mode-card { padding: 5px 12px; }
+.mode-card .ic { width: 34px; height: 34px; font-size: 20px; }
+#homeChars .char-opt { width: 34px; height: 34px; }
+#homeChars .char-opt .avatar { width: 32px; height: 32px; }
+.home-side .text-input { padding-top: 6px; padding-bottom: 6px; }
+/* ---------- 캐릭터 고르기 (시작 화면·대기실) ---------- */
+.char-pick { display: flex; flex-wrap: wrap; gap: 6px; }
+.char-opt { position: relative; width: 40px; height: 40px; padding: 0; border: 0; background: none; cursor: pointer; border-radius: 50%; }
+.char-opt .avatar { width: 38px; height: 38px; transition: transform 0.15s, box-shadow 0.15s; }
+.char-opt.on .avatar { transform: scale(1.1); box-shadow: 0 0 0 3px var(--sun), 0 0 0 5.5px var(--ink), 0 4px 0 3px var(--ink); }
+.char-opt.taken { cursor: not-allowed; }
+.char-opt.taken .avatar { opacity: 0.35; filter: grayscale(1); }
+.char-opt.taken::after {
+  content: attr(data-who); position: absolute; left: 50%; bottom: -5px; translate: -50% 0; max-width: 48px;
+  font-size: 9px; line-height: 1.4; padding: 0 3px; background: #fff; border: 1.5px solid var(--ink); border-radius: 6px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.char-box { display: grid; gap: 6px; }
+.char-box .label small { font-size: 11px; }
+.seats li.filled { display: flex; align-items: center; gap: 8px; padding-top: 6px; padding-bottom: 6px; }
+.seats li .avatar { width: 30px; height: 30px; box-shadow: 0 2px 0 var(--ink); }
+
 /* ==================== 꾸미기 (풍성·귀엽게. 타일 놓는 곳은 안 가림, 깜빡이는 효과 없음) ==================== */
 @media (prefers-reduced-motion: no-preference) {
   .decor .cloud { animation: drift linear infinite; }
@@ -461,10 +487,9 @@ body.framed #stage { border-radius: 26px; box-shadow: 0 0 0 5px var(--ink), 0 14
 .logo .tile:nth-child(4) { animation-delay: -2.1s; }
 
 /* 메뉴 카드: 아이콘 동그라미 + 반짝 윗광 */
-.mode-card { position: relative; overflow: hidden; grid-template-columns: 44px 1fr; }
-.mode-card::after { content: ''; position: absolute; left: 60px; right: 30%; top: 5px; height: 6px; border-radius: 99px; background: rgba(255, 255, 255, 0.8); }
+.mode-card { position: relative; overflow: hidden; grid-template-columns: 40px 1fr; }
 .mode-card .ic {
-  display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; font-size: 23px;
+  display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; font-size: 20px;
   background: #fff; border: 2.5px solid var(--ink); box-shadow: 0 2px 0 var(--ink);
 }
 .mode-card:nth-child(1) { background: linear-gradient(135deg, #fff8e1, #ffe08a); }
@@ -482,10 +507,7 @@ body.framed #stage { border-radius: 26px; box-shadow: 0 0 0 5px var(--ink), 0 14
 .room-code span:nth-child(3) { animation-delay: -1.2s; color: var(--c-y); }
 .room-code span:nth-child(4) { animation-delay: -1.8s; color: var(--c-k); }
 .seats li.filled { background: linear-gradient(90deg, #fff, #eef9ff); }
-.seats li.filled:nth-child(1)::before { content: "🐬 "; }
-.seats li.filled:nth-child(2)::before { content: "🦀 "; }
-.seats li.filled:nth-child(3)::before { content: "🐙 "; }
-.seats li.filled:nth-child(4)::before { content: "🐳 "; }
+.seats li.filled::before { content: none; }
 .seats li:not(.filled) { background: rgba(255, 255, 255, 0.4); }
 .seats li:not(.filled)::before { content: "🫧 "; }
 
