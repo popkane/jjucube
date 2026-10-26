@@ -1163,7 +1163,28 @@ function showEnd() {
   $('#againInfo').hidden = isHost();
   $('#homeBtn').textContent = mode === 'cpu' ? '그만하기' : '방 나가기';
   $('#end').hidden = false;
-  if (endSoundGid !== game.gid) { endSoundGid = game.gid; playWin(w === me()); }
+  if (endSoundGid !== game.gid) {
+    endSoundGid = game.gid;
+    playWin(w === me());
+    if (w !== null) confetti();
+  }
+}
+// 승리 꽃가루: 위에서 알록달록 떨어짐 (2~3초 뒤 사라짐)
+function confetti() {
+  const box = $('#end');
+  const colors = ['#ff6b6b', '#ffc93c', '#3fa9f5', '#2fbf71', '#ff8fa3', '#ffffff'];
+  for (let i = 0; i < 40; i++) {
+    const c = document.createElement('i');
+    c.className = 'confetti';
+    c.style.left = `${Math.random() * 100}%`;
+    c.style.background = colors[i % colors.length];
+    c.style.setProperty('--dx', `${(Math.random() - 0.5) * 120}px`);
+    c.style.setProperty('--rot', `${(Math.random() - 0.5) * 900}deg`);
+    c.style.animationDuration = `${1.8 + Math.random() * 1.4}s`;
+    c.style.animationDelay = `${Math.random() * 0.6}s`;
+    box.append(c);
+    setTimeout(() => c.remove(), 3800);
+  }
 }
 $('#againBtn').addEventListener('click', () => {
   if (mode === 'cpu') {

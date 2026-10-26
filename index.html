@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
-<link rel="stylesheet" href="css/style.css?v=202610262134">
+<link rel="stylesheet" href="css/style.css?v=202610262142">
 </head>
 <body>
 <!-- 모든 화면은 가로형 틀 하나(#stage) 안에. 창 크기에 맞춰 커지고, 폰을 세로로 들면 돌아간다 -->
@@ -19,6 +19,7 @@
 
 <!-- 시작 화면 -->
 <section id="home" class="screen">
+<div class="decor" aria-hidden="true"><i class="cloud c1"></i><i class="cloud soft c2"></i><i class="cloud c3"></i><i class="cloud soft c4"></i><i class="bubble b1"></i><i class="bubble b2"></i><i class="bubble b3"></i><i class="bubble b4"></i><i class="bubble b5"></i><i class="deco star" style="left:46%;bottom:26px;rotate:-12deg"></i><div class="waves"><i></i><i></i></div></div>
   <button id="fullBtn" class="full-btn">⛶ 전체화면</button>
   <div class="home-grid">
     <div class="home-art">
@@ -43,6 +44,15 @@
         <!-- 경포 바다 -->
         <path d="M0 132q15-9 30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0V210H0z" fill="#3fa9f5" stroke="#2b2d42" stroke-width="3" stroke-linejoin="round"/>
         <path d="M24 152q10-6 20 0M96 160q10-6 20 0M210 150q10-6 20 0M282 162q10-6 20 0" fill="none" stroke="#bfe8ff" stroke-width="3" stroke-linecap="round"/>
+        <!-- 물결 (살랑살랑) -->
+        <path class="waveline" d="M150 146q10-6 20 0M250 170q10-6 20 0M60 170q8-5 16 0" fill="none" stroke="#e6f6ff" stroke-width="3" stroke-linecap="round"/>
+        <!-- 돛단배 -->
+        <g class="boat" stroke="#2b2d42" stroke-width="2.5" stroke-linejoin="round">
+          <path d="M100 140h40l-6 9h-28z" fill="#ff6b6b"/>
+          <path d="M120 140v-34" fill="none"/>
+          <path d="M121 108l17 28h-17z" fill="#fff"/>
+          <path d="M119 112l-13 24h13z" fill="#ffe08a"/>
+        </g>
         <!-- 모래사장 -->
         <path d="M0 182q60-14 120-4t120-2t120 4V210H0z" fill="#f7dfa5" stroke="#2b2d42" stroke-width="3" stroke-linejoin="round"/>
         <!-- 소나무 -->
@@ -60,6 +70,14 @@
           <path d="M290 158v18M312 158v18M334 158v18" stroke-width="3"/>
           <path d="M284 176h56v5h-56z" fill="#e9d8b4"/>
         </g>
+        <!-- 꽃게·조개 -->
+        <g class="crab" stroke="#2b2d42" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+          <path d="M196 196q0-9 11-9t11 9z" fill="#ff6b6b"/>
+          <path d="M197 192l-6-5M217 192l6-5M199 197l-4 4M215 197l4 4" fill="none"/>
+          <circle cx="190" cy="185" r="3.5" fill="#ff6b6b"/><circle cx="224" cy="185" r="3.5" fill="#ff6b6b"/>
+          <path d="M203 187v-4M211 187v-4" fill="none"/><circle cx="203" cy="182" r="1.6" fill="#2b2d42"/><circle cx="211" cy="182" r="1.6" fill="#2b2d42"/>
+        </g>
+        <g stroke="#2b2d42" stroke-width="2" stroke-linejoin="round"><path d="M108 199l-7-8a9 9 0 0 1 14 0z" fill="#ffb3c1"/></g>
         <!-- 갈매기 -->
         <path class="gull" d="M92 70q8-8 14 0q6-8 14 0" fill="none" stroke="#2b2d42" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
         <path class="gull" d="M232 82q5-5 9 0q4-5 9 0" fill="none" stroke="#2b2d42" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -146,6 +164,7 @@
 
 <!-- 대기실 -->
 <section id="lobby" class="screen" hidden>
+<div class="decor" aria-hidden="true"><i class="cloud c1"></i><i class="cloud soft c2"></i><i class="cloud c3"></i><i class="cloud soft c4"></i><i class="bubble b1"></i><i class="bubble b2"></i><i class="bubble b3"></i><i class="bubble b4"></i><i class="bubble b5"></i><i class="deco shell" style="left:3%;bottom:24px;rotate:-10deg"></i><i class="deco star" style="right:4%;bottom:26px;rotate:14deg"></i><div class="waves"><i></i><i></i></div></div>
   <button id="lobbyFullBtn" class="full-btn"></button>
   <div class="lobby-grid">
     <div class="lobby-code">
@@ -240,15 +259,15 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/ai.js": "./js/ai.js?v=202610262134",
-    "./js/app.js": "./js/app.js?v=202610262134",
-    "./js/board.js": "./js/board.js?v=202610262134",
-    "./js/characters.js": "./js/characters.js?v=202610262134",
-    "./js/engine.js": "./js/engine.js?v=202610262134",
-    "./js/firebase-config.js": "./js/firebase-config.js?v=202610262134",
-    "./js/net.js": "./js/net.js?v=202610262134",
-    "./js/rack.js": "./js/rack.js?v=202610262134",
-    "./js/sound.js": "./js/sound.js?v=202610262134"
+    "./js/ai.js": "./js/ai.js?v=202610262142",
+    "./js/app.js": "./js/app.js?v=202610262142",
+    "./js/board.js": "./js/board.js?v=202610262142",
+    "./js/characters.js": "./js/characters.js?v=202610262142",
+    "./js/engine.js": "./js/engine.js?v=202610262142",
+    "./js/firebase-config.js": "./js/firebase-config.js?v=202610262142",
+    "./js/net.js": "./js/net.js?v=202610262142",
+    "./js/rack.js": "./js/rack.js?v=202610262142",
+    "./js/sound.js": "./js/sound.js?v=202610262142"
   }
 }
 </script>
@@ -263,6 +282,6 @@
     if (el && el.textContent === '연결 중…') el.textContent = '연결이 오래 걸려요. 새로고침해 보시고, 카톡 안에서 열었다면 크롬·사파리로 열어 주세요';
   }, 10000);
 </script>
-<script type="module" src="js/app.js?v=202610262134"></script>
+<script type="module" src="js/app.js?v=202610262142"></script>
 </body>
 </html>
